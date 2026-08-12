@@ -13,6 +13,9 @@ jobs:
     permissions:
       contents: write
 
+    env:
+      ACTIONS_NODE20_SILENCE_WARNINGS: 'true'
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
