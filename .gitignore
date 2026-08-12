@@ -1,0 +1,26 @@
+# Visual Studio & IDE temporary files
+.vs/
+*.user
+*.suo
+*.userosv
+*.sln.docstates
+
+# Build outputs & binaries
+bin/Debug/
+bin/Release/
+obj/
+*.pdb
+
+# CRITICAL SECURITY: Exclude settings.ini containing plaintext API keys
+settings.ini
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
