@@ -1,0 +1,51 @@
+name: Build & Release CSF Studio
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-release:
+    name: Build & Create Release
+    runs-on: windows-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build Solution (Release Configuration)
+        run: msbuild CSFStudio.sln /p:Configuration=Release /verbosity:normal
+
+      - name: Package Release Files
+        shell: powershell
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $zipName = "CSF-Studio $tag.zip"
+          $stageDir = "staging"
+
+          New-Item -ItemType Directory -Path $stageDir -Force
+
+          Copy-Item "bin\Release\CSF Studio.exe" "$stageDir\"
+          Copy-Item "LICENSE" "$stageDir\"
+          Copy-Item "README.md" "$stageDir\"
+
+          Compress-Archive -Path "$stageDir\*" -DestinationPath $zipName -Force
+          Write-Host "Created release package: $zipName"
+
+      - name: Create GitHub Release Draft
+        uses: softprops/action-gh-release@v2
+        with:
+          files: CSF-Studio *.zip
+          name: CSF Studio ${{ github.ref_name }}
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
