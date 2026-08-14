@@ -41,7 +41,7 @@ namespace CsfStudio.Core.Translation
     public class GlobalTranslationSettings
     {
         public string DefaultSourceLanguage { get; set; } = "en";
-        public string DefaultSystemPrompt { get; set; } = "You are an expert game localizer for Command & Conquer: Red Alert 2. Translate string table values accurately while preserving military tone, conciseness, and brevity. NEVER alter or translate formatting tags like \\n or variables like {0}.";
+        public string DefaultSystemPrompt { get; set; } = "You are an expert game localizer for Command & Conquer: Red Alert 2. Translate string table values accurately while preserving military tone, conciseness, and brevity. Keep standard gaming and technical acronyms (such as UI, HUD, GUI, HP, XP, AI, FPS) intact without expanding them into long words. NEVER alter or translate formatting tags like \\n or variables like {0}.";
         public int BatchSize { get; set; } = 25;
         public int DelayBetweenBatchesMs { get; set; } = 300;
         public string ActiveServices { get; set; } = string.Empty;

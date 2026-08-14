@@ -65,7 +65,7 @@ namespace CsfStudio.UI
 
             btnResetPrompt.Click += (s, e) =>
             {
-                txtSystemPrompt.Text = LanguageManager.GetString("TranslationSettings.DefaultSystemPromptText", "You are an expert game localizer for Command & Conquer: Red Alert 2. Translate string table values accurately while preserving military tone, conciseness, and brevity. NEVER alter or translate formatting tags like \\n or variables like {0}.");
+                txtSystemPrompt.Text = LanguageManager.GetString("TranslationSettings.DefaultSystemPromptText", "You are an expert game localizer for Command & Conquer: Red Alert 2. Translate string table values accurately while preserving military tone, conciseness, and brevity. Keep standard gaming and technical acronyms (such as UI, HUD, GUI, HP, XP, AI, FPS) intact without expanding them into long words. NEVER alter or translate formatting tags like \\n or variables like {0}.");
             };
 
             var lblSourceLang = new Label { Text = LanguageManager.GetString("TranslationSettings.DefaultSourceLang", "Default Source Language:"), Location = new Point(10, 115), AutoSize = true };
