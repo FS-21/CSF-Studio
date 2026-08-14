@@ -1,3 +1,5 @@
+<img width="1115" height="752" alt="image" src="https://github.com/user-attachments/assets/2fc7da7a-93be-46a4-afad-ba3d2322d8ba" />
+
 # CSF Studio
 
 ![License GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)
