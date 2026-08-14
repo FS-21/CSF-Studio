@@ -94,7 +94,10 @@ namespace CsfStudio.Core
 
     public class EditValueCommand : IUndoCommand
     {
-        public string Description => $"Edit '{TargetKeyName}' [{TargetLanguageTag}]";
+        public string Description => string.Format(
+            LanguageManager.GetString("Undo.EditValue", "Edit '{0}' [{1}]"),
+            TargetKeyName,
+            TargetLanguageTag);
         public string TargetLanguageTag { get; }
         public string TargetKeyName { get; }
         public string OldValue { get; }
@@ -153,7 +156,9 @@ namespace CsfStudio.Core
 
     public class AddKeyCommand : IUndoCommand
     {
-        public string Description => $"Add key '{TargetKeyName}'";
+        public string Description => string.Format(
+            LanguageManager.GetString("Undo.AddKey", "Add key '{0}'"),
+            TargetKeyName);
         public string TargetLanguageTag { get; }
         public string TargetKeyName { get; }
 
@@ -198,7 +203,10 @@ namespace CsfStudio.Core
             public Dictionary<string, (string Value, string Extra)> ValuesPerLanguage { get; set; } = new Dictionary<string, (string, string)>(StringComparer.OrdinalIgnoreCase);
         }
 
-        public string Description => KeysData.Count == 1 ? $"Delete key '{KeysData[0].KeyName}'" : $"Delete {KeysData.Count} keys";
+        public string Description => KeysData.Count == 1
+            ? string.Format(LanguageManager.GetString("Undo.DeleteKeySingle", "Delete key '{0}'"), KeysData[0].KeyName)
+            : string.Format(LanguageManager.GetString("Undo.DeleteKeyPlural", "Delete {0} keys"), KeysData.Count);
+
         public string TargetLanguageTag => KeysData.FirstOrDefault()?.ValuesPerLanguage.Keys.FirstOrDefault();
         public string TargetKeyName => KeysData.FirstOrDefault()?.KeyName;
 
@@ -256,7 +264,10 @@ namespace CsfStudio.Core
 
     public class RenameKeyCommand : IUndoCommand
     {
-        public string Description => $"Rename '{OldKeyName}' -> '{NewKeyName}'";
+        public string Description => string.Format(
+            LanguageManager.GetString("Undo.RenameKey", "Rename '{0}' -> '{1}'"),
+            OldKeyName,
+            NewKeyName);
         public string TargetLanguageTag { get; }
         public string TargetKeyName => NewKeyName;
         public string OldKeyName { get; }
@@ -310,7 +321,7 @@ namespace CsfStudio.Core
 
         public BatchUndoCommand(string description, IEnumerable<IUndoCommand> commands)
         {
-            Description = description ?? "Batch Operation";
+            Description = description ?? LanguageManager.GetString("Undo.BatchOperation", "Batch Operation");
             if (commands != null)
             {
                 Commands.AddRange(commands);
@@ -341,7 +352,9 @@ namespace CsfStudio.Core
 
     public class ReorderKeyCommand : IUndoCommand
     {
-        public string Description => KeyNames != null && KeyNames.Count > 1 ? $"Move {KeyNames.Count} keys" : $"Move '{TargetKeyName}'";
+        public string Description => KeyNames != null && KeyNames.Count > 1
+            ? string.Format(LanguageManager.GetString("Undo.MoveKeysPlural", "Move {0} keys"), KeyNames.Count)
+            : string.Format(LanguageManager.GetString("Undo.MoveKeySingle", "Move '{0}'"), TargetKeyName);
         public string TargetLanguageTag => null;
         public string TargetKeyName => KeyNames != null && KeyNames.Count > 0 ? KeyNames[0] : null;
         public List<string> KeyNames { get; }

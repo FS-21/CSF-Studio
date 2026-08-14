@@ -58,9 +58,9 @@ namespace CsfStudio.Core
 
     public static class BackupManager
     {
-        public static string GetBackupDirectory(string baseFilePath, string customBackupFolder = null, bool saveInAppData = false)
+        public static string GetBackupDirectory(string baseFilePath, string customBackupFolder = null)
         {
-            string mainBackupsFolder = ConfigManager.ResolveBackupDirectory(customBackupFolder, saveInAppData);
+            string mainBackupsFolder = ConfigManager.ResolveBackupDirectory(customBackupFolder);
 
             if (string.IsNullOrEmpty(baseFilePath)) return Path.Combine(mainBackupsFolder, "DefaultSession");
 
@@ -76,13 +76,13 @@ namespace CsfStudio.Core
             }
         }
 
-        public static SessionSnapshot CreateSessionSnapshot(CsfSession session, string cause = "Manual Save", string customBackupFolder = null, bool saveInAppData = false)
+        public static SessionSnapshot CreateSessionSnapshot(CsfSession session, string cause = "Manual Save", string customBackupFolder = null)
         {
             if (session == null || session.Documents.Count == 0) return null;
 
             var baseDoc = session.BaseDocument ?? session.Documents.FirstOrDefault();
             string docPathOrName = !string.IsNullOrEmpty(baseDoc?.FilePath) ? baseDoc.FilePath : baseDoc?.FileName;
-            string backupDir = GetBackupDirectory(docPathOrName, customBackupFolder, saveInAppData);
+            string backupDir = GetBackupDirectory(docPathOrName, customBackupFolder);
             if (string.IsNullOrEmpty(backupDir)) return null;
 
             try
@@ -143,7 +143,7 @@ namespace CsfStudio.Core
 
                 // Auto-prune old backups according to user configuration
                 var config = ConfigManager.LoadConfig();
-                PruneOldSnapshots(baseDoc?.FilePath, maxDays: config.AutoDeleteBackupDays, maxSnapshots: config.MaxBackupSnapshots, customBackupFolder: customBackupFolder, saveInAppData: saveInAppData);
+                PruneOldSnapshots(baseDoc?.FilePath, maxDays: config.AutoDeleteBackupDays, maxSnapshots: config.MaxBackupSnapshots, customBackupFolder: customBackupFolder);
 
                 return new SessionSnapshot
                 {
@@ -250,12 +250,12 @@ namespace CsfStudio.Core
             return manifest;
         }
 
-        public static List<SessionSnapshot> GetAvailableSnapshots(string baseFilePath, string customBackupFolder = null, bool saveInAppData = false)
+        public static List<SessionSnapshot> GetAvailableSnapshots(string baseFilePath, string customBackupFolder = null)
         {
             var result = new List<SessionSnapshot>();
             if (string.IsNullOrEmpty(baseFilePath)) return result;
 
-            string targetBackupDir = GetBackupDirectory(baseFilePath, customBackupFolder, saveInAppData);
+            string targetBackupDir = GetBackupDirectory(baseFilePath, customBackupFolder);
             if (!Directory.Exists(targetBackupDir)) return result;
 
             var snapshotDirs = Directory.GetDirectories(targetBackupDir, "Snapshot_*");
@@ -329,9 +329,9 @@ namespace CsfStudio.Core
             return false;
         }
 
-        public static bool DeleteAllSnapshots(string baseFilePath, string customBackupDir = null, bool saveInAppData = false)
+        public static bool DeleteAllSnapshots(string baseFilePath, string customBackupDir = null)
         {
-            var snapshots = GetAvailableSnapshots(baseFilePath, customBackupDir, saveInAppData);
+            var snapshots = GetAvailableSnapshots(baseFilePath, customBackupDir);
             if (snapshots.Count == 0) return false;
 
             foreach (var snap in snapshots)
@@ -348,9 +348,9 @@ namespace CsfStudio.Core
             return true;
         }
 
-        public static void PruneOldSnapshots(string baseFilePath, int maxDays = 30, int maxSnapshots = 30, string customBackupFolder = null, bool saveInAppData = false)
+        public static void PruneOldSnapshots(string baseFilePath, int maxDays = 30, int maxSnapshots = 30, string customBackupFolder = null)
         {
-            string backupDir = GetBackupDirectory(baseFilePath, customBackupFolder, saveInAppData);
+            string backupDir = GetBackupDirectory(baseFilePath, customBackupFolder);
             if (string.IsNullOrEmpty(backupDir) || !Directory.Exists(backupDir)) return;
 
             try

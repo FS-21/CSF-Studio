@@ -51,7 +51,7 @@ namespace CsfStudio.UI
 
         private void InitializeComponent()
         {
-            this.Text = "UTF-8 Text Import Preview & Diff";
+            this.Text = LanguageManager.GetString("ImportPreview.Title", "UTF-8 Text Import Preview & Diff");
             this.Size = new Size(880, 550);
             this.StartPosition = FormStartPosition.CenterParent;
             this.ShowIcon = false;
@@ -59,7 +59,7 @@ namespace CsfStudio.UI
             var panelTop = new Panel { Dock = DockStyle.Top, Height = 45, Padding = new Padding(10) };
             lblSummary = new Label { Location = new Point(10, 12), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 9, FontStyle.Bold) };
 
-            var btnSelectNewOnly = new Button { Text = "🆕 New Keys Only", Location = new Point(430, 8), Size = new Size(115, 26) };
+            var btnSelectNewOnly = new Button { Text = LanguageManager.GetString("ImportPreview.NewKeysOnly", "🆕 New Keys Only"), Location = new Point(430, 8), Size = new Size(115, 26) };
             btnSelectNewOnly.Click += (s, e) =>
             {
                 foreach (DataGridViewRow row in gridDiff.Rows)
@@ -68,7 +68,7 @@ namespace CsfStudio.UI
                 }
             };
 
-            var btnSelectConflictsOnly = new Button { Text = "⚡ Conflicts Only", Location = new Point(550, 8), Size = new Size(110, 26) };
+            var btnSelectConflictsOnly = new Button { Text = LanguageManager.GetString("ImportPreview.ConflictsOnly", "⚡ Conflicts Only"), Location = new Point(550, 8), Size = new Size(110, 26) };
             btnSelectConflictsOnly.Click += (s, e) =>
             {
                 foreach (DataGridViewRow row in gridDiff.Rows)
@@ -77,13 +77,13 @@ namespace CsfStudio.UI
                 }
             };
 
-            var btnCheckAll = new Button { Text = "☑️ Check All", Location = new Point(665, 8), Size = new Size(90, 26) };
+            var btnCheckAll = new Button { Text = LanguageManager.GetString("ImportPreview.CheckAll", "☑️ Check All"), Location = new Point(665, 8), Size = new Size(90, 26) };
             btnCheckAll.Click += (s, e) =>
             {
                 foreach (DataGridViewRow row in gridDiff.Rows) row.Cells[CheckColumnIndex].Value = true;
             };
 
-            var btnUncheckAll = new Button { Text = "⬜ Uncheck All", Location = new Point(760, 8), Size = new Size(95, 26) };
+            var btnUncheckAll = new Button { Text = LanguageManager.GetString("ImportPreview.UncheckAll", "⬜ Uncheck All"), Location = new Point(760, 8), Size = new Size(95, 26) };
             btnUncheckAll.Click += (s, e) =>
             {
                 foreach (DataGridViewRow row in gridDiff.Rows) row.Cells[CheckColumnIndex].Value = false;
@@ -108,12 +108,12 @@ namespace CsfStudio.UI
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
             };
 
-            var colTarget = new DataGridViewTextBoxColumn { HeaderText = "Target CSF", ReadOnly = true, Width = 180 };
-            var colCheck = new DataGridViewCheckBoxColumn { HeaderText = "Import", Width = 70 };
-            var colKey = new DataGridViewTextBoxColumn { HeaderText = "Label (Key)", ReadOnly = true, Width = 160 };
-            var colType = new DataGridViewTextBoxColumn { HeaderText = "Status", ReadOnly = true, Width = 100 };
-            var colCurrent = new DataGridViewTextBoxColumn { HeaderText = "Current CSF Value", ReadOnly = true };
-            var colImported = new DataGridViewTextBoxColumn { HeaderText = "Imported Value", ReadOnly = true };
+            var colTarget = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("ImportPreview.ColTarget", "Target CSF"), ReadOnly = true, Width = 180 };
+            var colCheck = new DataGridViewCheckBoxColumn { HeaderText = LanguageManager.GetString("ImportPreview.ColImport", "Import"), Width = 70 };
+            var colKey = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Grid.Column.Key", "Label (Key)"), ReadOnly = true, Width = 160 };
+            var colType = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Grid.Column.Status", "Status"), ReadOnly = true, Width = 100 };
+            var colCurrent = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("ImportPreview.ColCurrent", "Current CSF Value"), ReadOnly = true };
+            var colImported = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("ImportPreview.ColImported", "Imported Value"), ReadOnly = true };
 
             gridDiff.Columns.AddRange(colTarget, colCheck, colKey, colType, colCurrent, colImported);
 
@@ -121,7 +121,7 @@ namespace CsfStudio.UI
             
             lblTargetScope = new Label
             {
-                Text = "Target File:",
+                Text = LanguageManager.GetString("ImportPreview.TargetFile", "Target File:"),
                 Location = new Point(10, 15),
                 AutoSize = true,
                 Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold)
@@ -138,7 +138,7 @@ namespace CsfStudio.UI
 
             lblImportMode = new Label
             {
-                Text = "Import Content:",
+                Text = LanguageManager.GetString("ImportPreview.ImportContent", "Import Content:"),
                 Location = new Point(345, 15),
                 AutoSize = true,
                 Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold)
@@ -151,15 +151,15 @@ namespace CsfStudio.UI
                 Size = new Size(220, 24),
                 Font = new Font(FontFamily.GenericSansSerif, 8.5f)
             };
-            cmbImportMode.Items.Add("Everything");
-            cmbImportMode.Items.Add("Keys Only");
-            cmbImportMode.Items.Add("Text Values Only");
-            cmbImportMode.Items.Add("Audio WAVs Only");
+            cmbImportMode.Items.Add(LanguageManager.GetString("ImportPreview.ModeAll", "Everything"));
+            cmbImportMode.Items.Add(LanguageManager.GetString("ImportPreview.ModeKeys", "Keys Only"));
+            cmbImportMode.Items.Add(LanguageManager.GetString("ImportPreview.ModeText", "Text Values Only"));
+            cmbImportMode.Items.Add(LanguageManager.GetString("ImportPreview.ModeAudio", "Audio WAVs Only"));
             cmbImportMode.SelectedIndex = 0;
 
             chkOverwriteConflicts = new CheckBox
             {
-                Text = "⚡ Overwrite Existing Conflicts",
+                Text = LanguageManager.GetString("ImportPreview.OverwriteConflicts", "⚡ Overwrite Existing Conflicts"),
                 Location = new Point(10, 48),
                 AutoSize = true,
                 Checked = false,
@@ -178,8 +178,22 @@ namespace CsfStudio.UI
                 }
             };
 
-            btnImportSelected = new Button { Text = "Import Selected", DialogResult = DialogResult.OK, Location = new Point(590, 42), Size = new Size(150, 30), Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
-            btnCancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Location = new Point(750, 42), Size = new Size(90, 30) };
+            btnImportSelected = new Button
+            {
+                Text = LanguageManager.GetString("ImportPreview.BtnImport", "📥 Import Selected Entries"),
+                DialogResult = DialogResult.OK,
+                Location = new Point(450, 44),
+                Size = new Size(220, 30),
+                Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold)
+            };
+
+            btnCancel = new Button
+            {
+                Text = LanguageManager.GetString("Button.Cancel", "Cancel"),
+                DialogResult = DialogResult.Cancel,
+                Location = new Point(680, 44),
+                Size = new Size(90, 30)
+            };
 
             btnImportSelected.Click += BtnImportSelected_Click;
 
@@ -207,12 +221,15 @@ namespace CsfStudio.UI
             }
 
             int selectedIdx = 0;
+            string tagBase = LanguageManager.GetString("ImportPreview.TagBase", " 📌 BASE");
             for (int i = 0; i < _session.Documents.Count; i++)
             {
                 var doc = _session.Documents[i];
-                string isMain = doc == _session.BaseDocument ? " 📌 BASE" : "";
+                string isMain = doc == _session.BaseDocument ? tagBase : "";
                 string fileName = System.IO.Path.GetFileName(doc.FilePath);
-                string itemText = $"[{doc.LanguageTag}]{isMain} - {fileName} - {doc.Document.Labels.Count:N0} keys";
+                string itemText = string.Format(
+                    LanguageManager.GetString("ImportPreview.ItemFormat", "[{0}]{1} - {2} - {3:N0} keys"),
+                    doc.LanguageTag, isMain, fileName, doc.Document.Labels.Count);
                 cmbTargetScope.Items.Add(itemText);
 
                 if (_defaultTargetDoc != null && doc == _defaultTargetDoc)
@@ -223,7 +240,7 @@ namespace CsfStudio.UI
 
             if (_session.Documents.Count > 1)
             {
-                cmbTargetScope.Items.Add("⚠️ ALL OPEN CSF FILES IN SESSION");
+                cmbTargetScope.Items.Add(LanguageManager.GetString("ImportPreview.AllOpenCsfInSession", "⚠️ ALL OPEN CSF FILES IN SESSION"));
             }
 
             cmbTargetScope.SelectedIndex = selectedIdx;
@@ -285,12 +302,17 @@ namespace CsfStudio.UI
                     ? string.Empty
                     : $"[{item.TargetDocument.LanguageTag}] {item.TargetDocument.FileName}";
 
+                string statusText = item.IsNewKey
+                    ? LanguageManager.GetString("ImportPreview.StatusNew", "🆕 NEW")
+                    : LanguageManager.GetString("ImportPreview.StatusConflict", "⚡ CONFLICT");
+                string missingText = item.CurrentValue ?? LanguageManager.GetString("Grid.EmptyMissing", "(Empty / Missing)");
+
                 int rowIndex = gridDiff.Rows.Add(
                     targetDisplay,
                     item.ShouldImport,
                     item.KeyName,
-                    item.IsNewKey ? "🆕 NEW" : "⚡ CONFLICT",
-                    item.CurrentValue ?? "(Missing)",
+                    statusText,
+                    missingText,
                     item.ImportedValue
                 );
 
@@ -307,7 +329,9 @@ namespace CsfStudio.UI
                 }
             }
 
-            lblSummary.Text = $"Total keys to import: {DiffList.Count} | 🆕 New: {newCount} | ⚡ Conflicts: {conflictCount}";
+            lblSummary.Text = string.Format(
+                LanguageManager.GetString("ImportPreview.SummaryFormat", "Total keys to import: {0} | 🆕 New: {1} | ⚡ Conflicts: {2}"),
+                DiffList.Count, newCount, conflictCount);
         }
 
         private void BtnImportSelected_Click(object sender, EventArgs e)

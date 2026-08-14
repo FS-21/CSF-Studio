@@ -38,6 +38,7 @@ jobs:
           Copy-Item "bin\Release\CSF Studio.exe" "$stageDir\"
           Copy-Item "LICENSE" "$stageDir\"
           Copy-Item "README.md" "$stageDir\"
+          Copy-Item -Recurse "bin\Release\Translations" "$stageDir\"
 
           Compress-Archive -Path "$stageDir\*" -DestinationPath $zipName -Force
           Write-Host "Created release package: $zipName"

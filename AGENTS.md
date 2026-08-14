@@ -15,6 +15,7 @@
 - Max language version is **C# 7.3** (non-SDK net48 default): no switch expressions, ranges, or nullable reference annotations.
 - Assembly name is `CSF Studio` (with a space); root namespace is `CsfStudio`.
 - `bin\Debug\Translations\` holds real user game assets (.csf/.mix/.xnb) used for manual testing — do not delete or "clean" `bin\` blindly.
+- **Internationalization (i18n)**: All UI strings, dialog titles, labels, menu items, tooltips, toasts, and message boxes MUST be wrapped with `LanguageManager.GetString("Key", "Fallback")` or `LanguageManager.GetStringFormat("Key", "FallbackFormat", ...)`. When no translation file is active, fallback text hardcoded in C# is used. Translation files (`en.txt`, etc.) can be generated dynamically via the Options dialog.
 
 ## Architecture
 
@@ -44,7 +45,7 @@
 
 ## settings.ini gotchas
 
-- Parsed/written by the hand-rolled `ConfigManager` (sections are hardcoded in a switch). Location is beside the exe or `%APPDATA%\CSF Studio` depending on `SaveInAppData`.
+- Parsed/written by the hand-rolled `ConfigManager` (sections are hardcoded in a switch). Location is beside the exe (`settings.ini`).
 - On every save, a copy is also written to `<exe>\..\..\settings.ini` — the **repo-root `settings.ini` is a regenerated runtime artifact**, not source of truth; expect it to change after each app run.
 - Translation provider sections (any section not in the known list) live in the same file and store **API keys in plaintext** — never commit or expose this file.
 - History lists in the ini are delimited by `|||` (not pipes or commas).

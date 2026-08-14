@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
+using CsfStudio.Core;
 using CsfStudio.Core.Translation;
 
 namespace CsfStudio.UI
@@ -51,29 +52,29 @@ namespace CsfStudio.UI
 
         private void InitializeComponent()
         {
-            this.Text = "⚙️ Translation & AI Services Settings";
+            this.Text = LanguageManager.GetString("TranslationSettings.Title", "⚙️ Translation & AI Services Settings");
             this.Size = new Size(840, 600);
             this.MinimumSize = new Size(840, 600);
             this.StartPosition = FormStartPosition.CenterParent;
             this.ShowIcon = false;
 
             var pnlTop = new Panel { Dock = DockStyle.Top, Height = 155, Padding = new Padding(10) };
-            var lblGlobalPrompt = new Label { Text = "Global System Prompt for AI / LLM Models:", Location = new Point(10, 10), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
-            var btnResetPrompt = new Button { Text = "🔄 Reset Default System Prompt", Location = new Point(560, 5), Size = new Size(230, 24), Font = new Font(FontFamily.GenericSansSerif, 8f) };
+            var lblGlobalPrompt = new Label { Text = LanguageManager.GetString("TranslationSettings.GlobalPrompt", "Global System Prompt for AI / LLM Models:"), Location = new Point(10, 10), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
+            var btnResetPrompt = new Button { Text = LanguageManager.GetString("TranslationSettings.ResetPrompt", "🔄 Reset Default System Prompt"), Location = new Point(560, 5), Size = new Size(230, 24), Font = new Font(FontFamily.GenericSansSerif, 8f) };
             txtSystemPrompt = new TextBox { Location = new Point(10, 32), Size = new Size(780, 70), Multiline = true, ScrollBars = ScrollBars.Vertical };
 
             btnResetPrompt.Click += (s, e) =>
             {
-                txtSystemPrompt.Text = "You are an expert game localizer for Command & Conquer: Red Alert 2. Translate string table values accurately while preserving military tone, conciseness, and brevity. NEVER alter or translate formatting tags like \\n or variables like {0}.";
+                txtSystemPrompt.Text = LanguageManager.GetString("TranslationSettings.DefaultSystemPromptText", "You are an expert game localizer for Command & Conquer: Red Alert 2. Translate string table values accurately while preserving military tone, conciseness, and brevity. NEVER alter or translate formatting tags like \\n or variables like {0}.");
             };
 
-            var lblSourceLang = new Label { Text = "Default Source Language:", Location = new Point(10, 115), AutoSize = true };
+            var lblSourceLang = new Label { Text = LanguageManager.GetString("TranslationSettings.DefaultSourceLang", "Default Source Language:"), Location = new Point(10, 115), AutoSize = true };
             txtDefaultSourceLang = new TextBox { Location = new Point(160, 112), Size = new Size(60, 23) };
 
-            var lblBatch = new Label { Text = "Batch Size:", Location = new Point(240, 115), AutoSize = true };
+            var lblBatch = new Label { Text = LanguageManager.GetString("TranslationSettings.BatchSize", "Batch Size:"), Location = new Point(240, 115), AutoSize = true };
             numBatchSize = new NumericUpDown { Location = new Point(315, 112), Size = new Size(60, 23), Minimum = 1, Maximum = 100, Value = 25 };
 
-            var lblDelay = new Label { Text = "Batch Delay (ms):", Location = new Point(395, 115), AutoSize = true };
+            var lblDelay = new Label { Text = LanguageManager.GetString("TranslationSettings.BatchDelay", "Batch Delay (ms):"), Location = new Point(395, 115), AutoSize = true };
             numDelayMs = new NumericUpDown { Location = new Point(505, 112), Size = new Size(70, 23), Minimum = 0, Maximum = 5000, Value = 300 };
 
             pnlTop.Controls.Add(lblGlobalPrompt);
@@ -87,15 +88,15 @@ namespace CsfStudio.UI
             pnlTop.Controls.Add(numDelayMs);
 
             var pnlLeft = new Panel { Dock = DockStyle.Left, Width = 290, Padding = new Padding(10) };
-            var lblListTitle = new Label { Text = "Configured Services / AI Models", Location = new Point(10, 5), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
+            var lblListTitle = new Label { Text = LanguageManager.GetString("TranslationSettings.ServicesTitle", "Configured Services / AI Models"), Location = new Point(10, 5), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
             lstServices = new ListBox { Location = new Point(10, 25), Size = new Size(270, 215), DrawMode = DrawMode.OwnerDrawFixed, ItemHeight = 22 };
             lstServices.DrawItem += LstServices_DrawItem;
 
-            btnAddPreset = new Button { Text = "➕ Add New Service / AI Provider", Location = new Point(10, 248), Size = new Size(270, 28), Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold), BackColor = Color.FromArgb(225, 240, 255) };
-            btnDuplicate = new Button { Text = "📋 Duplicate Selected", Location = new Point(10, 282), Size = new Size(132, 26), Font = new Font(FontFamily.GenericSansSerif, 8f, FontStyle.Bold) };
-            btnRemove = new Button { Text = "❌ Remove", Location = new Point(148, 282), Size = new Size(132, 26), ForeColor = Color.DarkRed, Font = new Font(FontFamily.GenericSansSerif, 8f) };
-            btnMoveUp = new Button { Text = "▲ Move Up", Location = new Point(10, 313), Size = new Size(132, 26), Font = new Font(FontFamily.GenericSansSerif, 8f) };
-            btnMoveDown = new Button { Text = "▼ Move Down", Location = new Point(148, 313), Size = new Size(132, 26), Font = new Font(FontFamily.GenericSansSerif, 8f) };
+            btnAddPreset = new Button { Text = LanguageManager.GetString("TranslationSettings.BtnAddService", "➕ Add New Service / AI Provider"), Location = new Point(10, 248), Size = new Size(270, 28), Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold), BackColor = Color.FromArgb(225, 240, 255) };
+            btnDuplicate = new Button { Text = LanguageManager.GetString("TranslationSettings.BtnDuplicate", "📋 Duplicate Selected"), Location = new Point(10, 282), Size = new Size(132, 26), Font = new Font(FontFamily.GenericSansSerif, 8f, FontStyle.Bold) };
+            btnRemove = new Button { Text = LanguageManager.GetString("TranslationSettings.BtnRemove", "❌ Remove"), Location = new Point(148, 282), Size = new Size(132, 26), ForeColor = Color.DarkRed, Font = new Font(FontFamily.GenericSansSerif, 8f) };
+            btnMoveUp = new Button { Text = LanguageManager.GetString("TranslationSettings.BtnMoveUp", "▲ Move Up"), Location = new Point(10, 313), Size = new Size(132, 26), Font = new Font(FontFamily.GenericSansSerif, 8f) };
+            btnMoveDown = new Button { Text = LanguageManager.GetString("TranslationSettings.BtnMoveDown", "▼ Move Down"), Location = new Point(148, 313), Size = new Size(132, 26), Font = new Font(FontFamily.GenericSansSerif, 8f) };
 
             pnlLeft.Controls.Add(lblListTitle);
             pnlLeft.Controls.Add(lstServices);
@@ -105,7 +106,7 @@ namespace CsfStudio.UI
             pnlLeft.Controls.Add(btnMoveUp);
             pnlLeft.Controls.Add(btnMoveDown);
 
-            var pnlRight = new GroupBox { Text = "Selected Service Properties", Dock = DockStyle.Fill, Padding = new Padding(15) };
+            var pnlRight = new GroupBox { Text = LanguageManager.GetString("TranslationSettings.PropertiesTitle", "Selected Service Properties"), Dock = DockStyle.Fill, Padding = new Padding(15) };
             int y = 25;
             Label AddField(string label, Control ctrl)
             {
@@ -126,7 +127,7 @@ namespace CsfStudio.UI
             cboModel = new ComboBox { DropDownStyle = ComboBoxStyle.DropDown };
             txtUrlTemplate = new TextBox();
 
-            chkIsEnabled = new CheckBox { Text = "👁️ Active / Visible in Translation Dialogs & Menus", AutoSize = true };
+            chkIsEnabled = new CheckBox { Text = LanguageManager.GetString("TranslationSettings.ChkIsEnabled", "👁️ Active / Visible in Translation Dialogs & Menus"), AutoSize = true };
             chkIsEnabled.Location = new Point(140, y);
             pnlRight.Controls.Add(chkIsEnabled);
             y += 32;
@@ -140,19 +141,19 @@ namespace CsfStudio.UI
                 }
             };
 
-            AddField("Display Name:", txtDisplayName);
-            AddField("Provider Type:", cboProviderType);
-            AddField("API Key:", txtApiKey);
-            AddField("Endpoint URL:", txtEndpoint);
+            AddField(LanguageManager.GetString("TranslationSettings.DisplayName", "Display Name:"), txtDisplayName);
+            AddField(LanguageManager.GetString("TranslationSettings.ProviderType", "Provider Type:"), cboProviderType);
+            AddField(LanguageManager.GetString("TranslationSettings.ApiKey", "API Key:"), txtApiKey);
+            AddField(LanguageManager.GetString("TranslationSettings.EndpointUrl", "Endpoint URL:"), txtEndpoint);
 
             // Add Model Field with Fetch Button
-            lblModelField = new Label { Text = "AI Model Name:", Location = new Point(15, y + 3), AutoSize = true };
+            lblModelField = new Label { Text = LanguageManager.GetString("TranslationSettings.ModelName", "AI Model Name:"), Location = new Point(15, y + 3), AutoSize = true };
             cboModel.Location = new Point(140, y);
             cboModel.Width = 220;
 
             btnFetchModels = new Button
             {
-                Text = "🔄 Fetch Models",
+                Text = LanguageManager.GetString("Translation.FetchModels", "🔄 Fetch Models"),
                 Location = new Point(368, y - 1),
                 Size = new Size(122, 26),
                 Font = new Font(FontFamily.GenericSansSerif, 8f, FontStyle.Bold),
@@ -163,12 +164,16 @@ namespace CsfStudio.UI
             {
                 if (string.IsNullOrWhiteSpace(txtEndpoint.Text))
                 {
-                    MessageBox.Show("Please enter an Endpoint URL first.", "Fetch Models", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(
+                        LanguageManager.GetString("Msg.EnterEndpointFirst", "Please enter an Endpoint URL first."),
+                        LanguageManager.GetString("Title.FetchModels", "Fetch Models"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
                     return;
                 }
 
                 btnFetchModels.Enabled = false;
-                btnFetchModels.Text = "⏳ Fetching...";
+                btnFetchModels.Text = LanguageManager.GetString("TranslationSettings.Fetching", "⏳ Fetching...");
 
                 try
                 {
@@ -181,21 +186,33 @@ namespace CsfStudio.UI
                         if (!string.IsNullOrWhiteSpace(currentText)) cboModel.Text = currentText;
                         else cboModel.SelectedIndex = 0;
 
-                        MessageBox.Show($"✅ Discovered {models.Count} active models from server!", "Models Discovered", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        MessageBox.Show(
+                            string.Format(LanguageManager.GetString("Msg.ModelsDiscoveredFormat", "✅ Discovered {0} active models from server!"), models.Count),
+                            LanguageManager.GetString("Title.ModelsDiscovered", "Models Discovered"),
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
                     }
                     else
                     {
-                        MessageBox.Show("No models were returned by the server /v1/models endpoint.", "Fetch Models", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show(
+                            LanguageManager.GetString("Msg.NoModelsReturned", "No models were returned by the server /v1/models endpoint."),
+                            LanguageManager.GetString("Title.FetchModels", "Fetch Models"),
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"❌ Error fetching models from endpoint:\n\n{ex.Message}", "Fetch Models Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show(
+                        string.Format(LanguageManager.GetString("Msg.FetchModelsErrorFormat", "❌ Error fetching models from endpoint:\n\n{0}"), ex.Message),
+                        LanguageManager.GetString("Title.FetchModelsError", "Fetch Models Error"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
                 }
                 finally
                 {
                     btnFetchModels.Enabled = true;
-                    btnFetchModels.Text = "🔄 Fetch Models";
+                    btnFetchModels.Text = LanguageManager.GetString("Translation.FetchModels", "🔄 Fetch Models");
                     UpdateTestButtonState();
                 }
             };
@@ -212,7 +229,7 @@ namespace CsfStudio.UI
 
             btnTestConnection = new Button
             {
-                Text = "🔍 Test / Validate Connection",
+                Text = LanguageManager.GetString("TranslationSettings.BtnTestConn", "🔍 Test / Validate Connection"),
                 Location = new Point(140, y + 10),
                 Size = new Size(220, 32),
                 Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold),
@@ -223,7 +240,7 @@ namespace CsfStudio.UI
             btnTestConnection.Click += async (s, e) =>
             {
                 btnTestConnection.Enabled = false;
-                btnTestConnection.Text = "⏳ Testing...";
+                btnTestConnection.Text = LanguageManager.GetString("TranslationSettings.Testing", "⏳ Testing...");
 
                 var testConfig = new TranslationServiceConfig
                 {
@@ -248,31 +265,43 @@ namespace CsfStudio.UI
                         var res = await provider.TranslateBatchAsync(testItems, "en", "es", cts.Token);
                         if (res.Success && testItems.Count > 0 && !string.IsNullOrWhiteSpace(testItems[0].TranslatedText))
                         {
-                            MessageBox.Show($"✅ Connection and model validated successfully!\n\nTest result: 'Hello' -> '{testItems[0].TranslatedText}'", "Validation Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            MessageBox.Show(
+                                string.Format(LanguageManager.GetString("Msg.ValidationSuccessFormat", "✅ Connection and model validated successfully!\n\nTest result: 'Hello' -> '{0}'"), testItems[0].TranslatedText),
+                                LanguageManager.GetString("Title.ValidationSuccessful", "Validation Successful"),
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information);
                         }
                         else
                         {
-                            string err = res.ErrorMessage ?? "No response received from service endpoint.";
-                            MessageBox.Show($"❌ Connection validation failed:\n\n{err}", "Connection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            string err = res.ErrorMessage ?? LanguageManager.GetString("Msg.NoResponseFromService", "No response received from service endpoint.");
+                            MessageBox.Show(
+                                string.Format(LanguageManager.GetString("Msg.ValidationFailedFormat", "❌ Connection validation failed:\n\n{0}"), err),
+                                LanguageManager.GetString("Title.ConnectionError", "Connection Error"),
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"❌ Network or configuration error:\n\n{ex.Message}", "Connection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show(
+                        string.Format(LanguageManager.GetString("Msg.NetworkConfigErrorFormat", "❌ Network or configuration error:\n\n{0}"), ex.Message),
+                        LanguageManager.GetString("Title.ConnectionError", "Connection Error"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
                 }
                 finally
                 {
                     btnTestConnection.Enabled = true;
-                    btnTestConnection.Text = "🔍 Test / Validate Connection";
+                    btnTestConnection.Text = LanguageManager.GetString("TranslationSettings.BtnTestConn", "🔍 Test / Validate Connection");
                 }
             };
 
             pnlRight.Controls.Add(btnTestConnection);
 
             var pnlBottom = new Panel { Dock = DockStyle.Bottom, Height = 45, Padding = new Padding(10) };
-            btnSave = new Button { Text = "💾 Save Settings", DialogResult = DialogResult.OK, Location = new Point(570, 8), Size = new Size(130, 30), Font = new Font(FontFamily.GenericSansSerif, 9, FontStyle.Bold), BackColor = Color.FromArgb(35, 130, 215), ForeColor = Color.White };
-            btnCancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Location = new Point(710, 8), Size = new Size(90, 30) };
+            btnSave = new Button { Text = LanguageManager.GetString("Button.SaveSettings", "💾 Save Settings"), DialogResult = DialogResult.OK, Location = new Point(570, 8), Size = new Size(130, 30), Font = new Font(FontFamily.GenericSansSerif, 9, FontStyle.Bold), BackColor = Color.FromArgb(35, 130, 215), ForeColor = Color.White };
+            btnCancel = new Button { Text = LanguageManager.GetString("Button.Cancel", "Cancel"), DialogResult = DialogResult.Cancel, Location = new Point(710, 8), Size = new Size(90, 30) };
             pnlBottom.Controls.Add(btnSave);
             pnlBottom.Controls.Add(btnCancel);
 
@@ -370,19 +399,19 @@ namespace CsfStudio.UI
             {
                 bool hasModel = !string.IsNullOrWhiteSpace(cboModel?.Text);
                 btnTestConnection.Enabled = hasModel;
-                if (!hasModel)
+                if (cboProviderType.SelectedItem?.ToString() == "OpenAICompatible" && string.IsNullOrWhiteSpace(cboModel.Text))
                 {
-                    ToolTipHelper.SetToolTip(btnTestConnection, "Please click 'Fetch Models' to discover available models or select a model first before testing.");
+                    ToolTipHelper.SetToolTip(btnTestConnection, LanguageManager.GetString("ToolTip.TranslationSettings.FetchFirst", "Please click 'Fetch Models' to discover available models or select a model first before testing."));
                 }
                 else
                 {
-                    ToolTipHelper.SetToolTip(btnTestConnection, "Click to test and validate connection and model with the service provider.");
+                    ToolTipHelper.SetToolTip(btnTestConnection, LanguageManager.GetString("ToolTip.TranslationSettings.TestModel", "Click to test and validate connection and model with the service provider."));
                 }
             }
             else
             {
                 btnTestConnection.Enabled = true;
-                ToolTipHelper.SetToolTip(btnTestConnection, "Click to test and validate connection with the service provider.");
+                ToolTipHelper.SetToolTip(btnTestConnection, LanguageManager.GetString("ToolTip.TranslationSettings.TestConnection", "Click to test and validate connection with the service provider."));
             }
         }
 
@@ -481,10 +510,14 @@ namespace CsfStudio.UI
             {
                 SaveCurrentFormToSelected();
                 var source = TranslationConfigManager.ConfiguredServices[idx];
+                string defaultProvider = LanguageManager.GetString("TranslationSettings.DefaultProviderName", "Provider");
+                string baseName = source.DisplayName ?? defaultProvider;
+                string copyName = string.Format(LanguageManager.GetString("TranslationSettings.CopySuffixFormat", "{0} (Copy)"), baseName);
+
                 var newConfig = new TranslationServiceConfig
                 {
                     SectionName = "Provider_" + Guid.NewGuid().ToString("N").Substring(0, 8),
-                    DisplayName = (source.DisplayName ?? "Provider") + " (Copy)",
+                    DisplayName = copyName,
                     ProviderType = source.ProviderType,
                     ApiKey = source.ApiKey,
                     Endpoint = source.Endpoint,
@@ -509,7 +542,7 @@ namespace CsfStudio.UI
             var menu = new ContextMenuStrip();
 
             // --- CATEGORY 1: TRANSLATION SERVICES ---
-            var itemTransHeader = new ToolStripMenuItem("── 🌐 Translation Services ──") { Enabled = false, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
+            var itemTransHeader = new ToolStripMenuItem(LanguageManager.GetString("TranslationSettings.HeaderServices", "── 🌐 Translation Services ──")) { Enabled = false, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
             menu.Items.Add(itemTransHeader);
 
             menu.Items.Add("🌐 Google Translate (Web Free)", null, (s, ev) => AddPreset("Google Translate", "GoogleWeb", "", "", "", "https://translate.googleapis.com/translate_a/single?client=gtx&sl={src}&tl={tgt}&dt=t&q={text}"));
@@ -522,7 +555,7 @@ namespace CsfStudio.UI
             menu.Items.Add(new ToolStripSeparator());
 
             // --- CATEGORY 2: AI / LLM MODEL PROVIDERS ---
-            var itemAiHeader = new ToolStripMenuItem("── 🤖 AI Model Providers (LLM) ──") { Enabled = false, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
+            var itemAiHeader = new ToolStripMenuItem(LanguageManager.GetString("TranslationSettings.HeaderAiProviders", "── 🤖 AI Model Providers (LLM) ──")) { Enabled = false, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
             menu.Items.Add(itemAiHeader);
 
             menu.Items.Add("[AI] OpenCode Go (High-Speed)", null, (s, ev) => AddPreset("[AI] OpenCode Go", "OpenAICompatible", "", "https://opencode.ai/zen/go/v1/chat/completions", ""));
@@ -539,7 +572,7 @@ namespace CsfStudio.UI
             menu.Items.Add(new ToolStripSeparator());
 
             // --- CATEGORY 3: LOCAL AI & CUSTOM ENDPOINTS ---
-            var itemLocalHeader = new ToolStripMenuItem("── 🖥️ Local AI & Custom Endpoints ──") { Enabled = false, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
+            var itemLocalHeader = new ToolStripMenuItem(LanguageManager.GetString("TranslationSettings.HeaderLocalAi", "── 🖥️ Local AI & Custom Endpoints ──")) { Enabled = false, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
             menu.Items.Add(itemLocalHeader);
 
             menu.Items.Add("[AI] Ollama Local (http://localhost:11434)", null, (s, ev) => AddPreset("[AI] Ollama Local", "OpenAICompatible", "", "http://localhost:11434/v1/chat/completions", ""));

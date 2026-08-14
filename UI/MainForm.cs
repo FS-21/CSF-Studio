@@ -246,17 +246,18 @@ namespace CsfStudio.UI
                 _initialCommandLineFiles.AddRange(initialFilePaths);
             }
             InitializeComponent();
+            ApplyLocalization();
             ConfigManager.SaveConfig(_appConfig);
             this.Shown += MainForm_Shown;
 
-            lblFileFilter = new ToolStripLabel { Text = "📄 File View:" };
+            lblFileFilter = new ToolStripLabel { Text = LanguageManager.GetString("Toolbar.FileView", "📄 File View:") };
             cboFileFilter = new ToolStripComboBox
             {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 AutoSize = false,
                 Size = new System.Drawing.Size(200, 26),
                 Width = 200,
-                ToolTipText = "Select view mode: View all open CSF files side-by-side or focus on a single CSF file with missing key red highlighting."
+                ToolTipText = LanguageManager.GetString("ToolTip.CboFileFilter", "Select view mode: View all open CSF files side-by-side or focus on a single CSF file with missing key red highlighting.")
             };
 
             // Add File View controls to toolStrip1 (filter toolbar) at the beginning
@@ -347,7 +348,8 @@ namespace CsfStudio.UI
                                 ? cell.ToolTipText
                                 : cell.Value?.ToString();
 
-                            if (!string.IsNullOrEmpty(rawText) && rawText != "[MISSING]" && rawText != "[Missing Entry]" && !rawText.Contains("Missing Entry"))
+                            string missingText = LanguageManager.GetString("Grid.Status.MissingEntry", "[Missing Entry]");
+                            if (!string.IsNullOrEmpty(rawText) && rawText != "[MISSING]" && rawText != "[Missing Entry]" && !rawText.Contains("Missing Entry") && rawText != missingText && !rawText.Contains(missingText))
                             {
                                 string wrapped = WrapToolTipText(rawText, 45, 15);
                                 Point pt = targetGrid.PointToClient(Cursor.Position);
@@ -391,14 +393,20 @@ namespace CsfStudio.UI
             gridCoverage.MultiSelect = true;
 
             gridCoverage.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
-            if (colCovPercent != null)
+            if (colCovKey != null)
             {
-                colCovPercent.Width = 100;
-                colCovPercent.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+                colCovKey.Width = 260;
+                colCovKey.MinimumWidth = 180;
+                colCovKey.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
             }
             if (colCovStatus != null)
             {
                 colCovStatus.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            }
+            if (colCovPercent != null)
+            {
+                colCovPercent.Width = 115;
+                colCovPercent.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
             }
 
             gridLabels.AllowUserToResizeRows = false;
@@ -473,7 +481,7 @@ namespace CsfStudio.UI
                     g.FillRectangle(backBrush, bounds);
                 }
 
-                string cleanText = System.Text.RegularExpressions.Regex.Replace(tab.Text ?? string.Empty, @"[^\u0000-\u007F]+", "").Trim();
+                string cleanText = tab.Text ?? string.Empty;
 
                 FontStyle fontStyle = isSelected ? FontStyle.Bold : FontStyle.Regular;
                 using (var font = new Font(tabControlMain.Font, fontStyle))
@@ -497,11 +505,11 @@ namespace CsfStudio.UI
                 }
             };
 
-            tabMaster.ToolTipText = "📋 Master String Table: View and edit all keys across loaded CSF files in a side-by-side or master grid table.";
-            tabUnsaved.ToolTipText = "⚠️ Unsaved Changes: Inspector tab listing all modified string keys waiting to be saved to disk.";
-            tabRecent.ToolTipText = "🕒 Recent Edits: History log of keys modified during the current editing session.";
-            tabCoverage.ToolTipText = "📊 Coverage Matrix: Key completion percentage matrix across all open CSF files.";
-            tabBackups.ToolTipText = "💾 Backups & History: Snapshot history of automatically created session backups (.bak) with diff inspection and restore capabilities.";
+            ToolTipHelper.SetToolTip(tabMaster, LanguageManager.GetString("ToolTip.Tab.Master", "📋 Master String Table: View and edit all keys across loaded CSF files in a side-by-side or master grid table."));
+            ToolTipHelper.SetToolTip(tabUnsaved, LanguageManager.GetString("ToolTip.Tab.Unsaved", "⚠️ Unsaved Changes: Inspector tab listing all modified string keys waiting to be saved to disk."));
+            ToolTipHelper.SetToolTip(tabRecent, LanguageManager.GetString("ToolTip.Tab.Recent", "🕒 Recent Edits: History log of keys modified during the current editing session."));
+            ToolTipHelper.SetToolTip(tabCoverage, LanguageManager.GetString("ToolTip.Tab.Coverage", "📊 Coverage Matrix: Key completion percentage matrix across all open CSF files."));
+            ToolTipHelper.SetToolTip(tabBackups, LanguageManager.GetString("ToolTip.Tab.Backups", "💾 Backups & History: Snapshot history of automatically created session backups (.bak) with diff inspection and restore capabilities."));
 
             SetupTabControlToolTips(tabControlMain);
             InitializeKeyEditorTab();
@@ -510,10 +518,6 @@ namespace CsfStudio.UI
             pnlDetailContainer.Controls.Add(pnlLanguageEditors);
             pnlDetailContainer.Controls.Add(pnlDetailHeader);
             splitMasterDetail.Panel2.Controls.Add(pnlDetailContainer);
-
-            if (colCovBaseText != null) colCovBaseText.Visible = false;
-
-
 
             splitMasterDetail.Panel2Collapsed = true;
 
@@ -660,7 +664,7 @@ namespace CsfStudio.UI
                 _searchDebounceTimer.Stop();
                 PopulateMasterGrid();
             };
-            InitializeControlToolTips();
+            ApplyControlToolTips();
             InitializeBackupsTabControls();
             SetupDragAndDrop();
             NewSingleDocument();
@@ -810,15 +814,31 @@ namespace CsfStudio.UI
                     _session.SessionChanged += Session_Changed;
                 }
                 UpdateUIForSessionMode();
-                RebuildCategoryTreeAndGrid();
                 var existingRecent = RecentSessionsManager.FindRecentSession(_session);
+                if (existingRecent != null && existingRecent.Files != null)
+                {
+                    foreach (var d in _session.Documents)
+                    {
+                        if (string.IsNullOrEmpty(d.FilePath)) continue;
+                        var savedFile = existingRecent.Files.FirstOrDefault(f => string.Equals(f.FilePath, d.FilePath, StringComparison.OrdinalIgnoreCase));
+                        if (savedFile != null && !string.IsNullOrEmpty(savedFile.TranslationContentLanguage))
+                        {
+                            d.TranslationContentLanguage = savedFile.TranslationContentLanguage;
+                        }
+                    }
+                }
+                RebuildCategoryTreeAndGrid();
                 RecentSessionsManager.AddRecentSession(_session, _appConfig.MaxRecentSessionsItems, existingRecent?.UnpinnedLanguageTags, existingRecent?.LastSelectedKeyName, existingRecent?.ActiveTabName, existingRecent?.ActivePinnedLanguageTag);
                 RestoreSessionViewStateFromConfig();
-                ShowSaveNotification($"📂 Opened '{Path.GetFileName(filePath)}'");
+                ShowSaveNotification(string.Format(LanguageManager.GetString("Toast.OpenedSingleFileFormat", "📂 Opened '{0}'"), Path.GetFileName(filePath)));
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error opening file:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Msg.ErrorOpeningFileFormat", "Error opening file:\n{0}"), ex.Message),
+                    LanguageManager.GetString("Title.Error", "Error"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
         }
 
@@ -860,15 +880,31 @@ namespace CsfStudio.UI
                 }
 
                 UpdateUIForSessionMode();
-                RebuildCategoryTreeAndGrid();
                 var existingRecent = RecentSessionsManager.FindRecentSession(_session);
+                if (existingRecent != null && existingRecent.Files != null)
+                {
+                    foreach (var d in _session.Documents)
+                    {
+                        if (string.IsNullOrEmpty(d.FilePath)) continue;
+                        var savedFile = existingRecent.Files.FirstOrDefault(f => string.Equals(f.FilePath, d.FilePath, StringComparison.OrdinalIgnoreCase));
+                        if (savedFile != null && !string.IsNullOrEmpty(savedFile.TranslationContentLanguage))
+                        {
+                            d.TranslationContentLanguage = savedFile.TranslationContentLanguage;
+                        }
+                    }
+                }
+                RebuildCategoryTreeAndGrid();
                 RecentSessionsManager.AddRecentSession(_session, _appConfig.MaxRecentSessionsItems, existingRecent?.UnpinnedLanguageTags, existingRecent?.LastSelectedKeyName, existingRecent?.ActiveTabName, existingRecent?.ActivePinnedLanguageTag);
                 RestoreSessionViewStateFromConfig();
-                ShowSaveNotification($"📂 Opened multi-file session ({filePaths.Count} CSF files)");
+                ShowSaveNotification(string.Format(LanguageManager.GetString("Toast.OpenedMultiFileSessionFormat", "📂 Opened multi-file session ({0} CSF files)"), filePaths.Count));
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error opening files:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Msg.ErrorOpeningFilesFormat", "Error opening files:\n{0}"), ex.Message),
+                    LanguageManager.GetString("Title.Error", "Error"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
         }
 
@@ -899,7 +935,7 @@ namespace CsfStudio.UI
                     RebuildCategoryTreeAndGrid();
                     PopulateMasterGrid();
                     UpdateFormTitle();
-                    ShowSaveNotification($"⚡ INI Scan Complete: Reference keys processed");
+                    ShowSaveNotification(LanguageManager.GetString("Toast.IniScanComplete", "⚡ INI Scan Complete: Reference keys processed"));
                 }
             }
         }
@@ -923,20 +959,20 @@ namespace CsfStudio.UI
             }
             catch
             {
-                ShowSaveNotification($"⚠️ Ignored '{Path.GetFileName(filePath)}': Invalid or unsupported text format");
+                ShowSaveNotification(string.Format(LanguageManager.GetString("Toast.IgnoredInvalidFormat", "⚠️ Ignored '{0}': Invalid or unsupported text format"), Path.GetFileName(filePath)));
                 return;
             }
 
             if (importedLabels == null || importedLabels.Count == 0)
             {
-                ShowSaveNotification($"⚠️ Ignored '{Path.GetFileName(filePath)}': No valid CSF text entries found");
+                ShowSaveNotification(string.Format(LanguageManager.GetString("Toast.IgnoredNoEntriesFormat", "⚠️ Ignored '{0}': No valid CSF text entries found"), Path.GetFileName(filePath)));
                 return;
             }
 
             var diffs = CsfTxtExporterImporter.CompareImportDiff(defaultDoc.Document, importedLabels);
             if (diffs == null || diffs.Count == 0)
             {
-                ShowSaveNotification($"ℹ️ '{Path.GetFileName(filePath)}': All entries are already up to date");
+                ShowSaveNotification(string.Format(LanguageManager.GetString("Toast.UpToDateFormat", "ℹ️ '{0}': All entries are already up to date"), Path.GetFileName(filePath)));
                 return;
             }
 
@@ -947,7 +983,7 @@ namespace CsfStudio.UI
                     var selectedItems = previewDlg.DiffList.Where(d => d.ShouldImport).ToList();
                     if (selectedItems.Count == 0)
                     {
-                        ShowSaveNotification("ℹ️ Import cancelled (no entries selected)");
+                        ShowSaveNotification(LanguageManager.GetString("Toast.ImportCancelled", "ℹ️ Import cancelled (no entries selected)"));
                         return;
                     }
 
@@ -1017,13 +1053,13 @@ namespace CsfStudio.UI
                         {
                             ApplyItemsToDoc(documentGroup.Key, documentGroup.ToList());
                         }
-                        ShowSaveNotification($"⚡ Import Complete ({contentMode}): Applied {selectedItems.Count:N0} selected file/key changes across {selectedByDocument.Count():N0} CSF file(s)");
+                        ShowSaveNotification(string.Format(LanguageManager.GetString("Toast.ImportCompleteMultiFormat", "⚡ Import Complete ({0}): Applied {1:N0} selected file/key changes across {2:N0} CSF file(s)"), contentMode, selectedItems.Count, selectedByDocument.Count()));
                     }
                     else
                     {
                         var targetDoc = previewDlg.SelectedTargetDocument ?? defaultDoc;
                         ApplyItemsToDoc(targetDoc, selectedItems);
-                        ShowSaveNotification($"⚡ Import Complete ({contentMode}): Imported {selectedItems.Count:N0} keys into [{targetDoc.LanguageTag}]");
+                        ShowSaveNotification(string.Format(LanguageManager.GetString("Toast.ImportCompleteSingleFormat", "⚡ Import Complete ({0}): Imported {1:N0} keys into [{2}]"), contentMode, selectedItems.Count, targetDoc.LanguageTag));
                     }
 
                     UpdateUIForSessionMode();
@@ -1038,42 +1074,7 @@ namespace CsfStudio.UI
 
         private static string WrapToolTipText(string text, int maxLineLength = 45, int maxLines = 15)
         {
-            if (string.IsNullOrEmpty(text)) return string.Empty;
-            var lines = text.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
-            var wrappedLines = new List<string>();
-
-            foreach (var rawLine in lines)
-            {
-                string line = rawLine;
-                if (line.Length <= maxLineLength)
-                {
-                    wrappedLines.Add(line);
-                }
-                else
-                {
-                    while (line.Length > maxLineLength)
-                    {
-                        int splitIndex = line.LastIndexOf(' ', maxLineLength);
-                        // If no space or space is too far back (>15 chars), force hard wrap at maxLineLength (~450px)
-                        if (splitIndex <= 15) splitIndex = maxLineLength;
-
-                        wrappedLines.Add(line.Substring(0, splitIndex).TrimEnd());
-                        line = line.Substring(splitIndex).TrimStart();
-                    }
-                    if (line.Length > 0)
-                    {
-                        wrappedLines.Add(line);
-                    }
-                }
-
-                if (wrappedLines.Count >= maxLines)
-                {
-                    wrappedLines.Add("... [Preview truncated]");
-                    break;
-                }
-            }
-
-            return string.Join(Environment.NewLine, wrappedLines);
+            return ToolTipHelper.WrapText(text, maxLineLength, maxLines);
         }
 
         private static string NormalizeToWinFormsLineBreaks(string str)
@@ -1170,7 +1171,7 @@ namespace CsfStudio.UI
             UpdateUIForSessionMode();
             RebuildCategoryTreeAndGrid();
             UpdateFormTitle();
-            if (lblStatusCount != null) lblStatusCount.Text = "Started a new blank CSF session.";
+            if (lblStatusCount != null) lblStatusCount.Text = LanguageManager.GetString("MainForm.StatusNewBlankSession", "Started a new blank CSF session.");
         }
 
         private void OpenSingleDocument()
@@ -1179,8 +1180,8 @@ namespace CsfStudio.UI
 
             using (var dlg = new OpenFileDialog())
             {
-                dlg.Filter = "Command & Conquer String Tables (*.csf)|*.csf|Plain Text UTF-8 (*.txt)|*.txt|All Files (*.*)|*.*";
-                dlg.Title = "Open CSF or String Table File";
+                dlg.Filter = LanguageManager.GetString("Filter.CsfMultiOpenFilter", "Command & Conquer String Tables (*.csf)|*.csf|Plain Text UTF-8 (*.txt)|*.txt|All Files (*.*)|*.*");
+                dlg.Title = LanguageManager.GetString("MainForm.OpenCsfTitle", "Open CSF or String Table File");
                 InitFileDialogDirectory(dlg);
                 if (dlg.ShowDialog() == DialogResult.OK)
                 {
@@ -1216,7 +1217,11 @@ namespace CsfStudio.UI
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show($"Error opening file:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        MessageBox.Show(
+                            string.Format(LanguageManager.GetString("Msg.ErrorOpeningFileFormat", "Error opening file:\n{0}"), ex.Message),
+                            LanguageManager.GetString("Title.Error", "Error"),
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
                     }
                 }
             }
@@ -1284,7 +1289,7 @@ namespace CsfStudio.UI
 
             if (recentList.Count == 0)
             {
-                var emptyItem = new ToolStripMenuItem("(No recent sessions)") { Enabled = false };
+                var emptyItem = new ToolStripMenuItem(LanguageManager.GetString("Menu.File.NoRecentSessions", "(No recent sessions)")) { Enabled = false };
                 menuRecentSessions.DropDownItems.Add(emptyItem);
                 return;
             }
@@ -1311,7 +1316,7 @@ namespace CsfStudio.UI
             }
 
             menuRecentSessions.DropDownItems.Add(new ToolStripSeparator());
-            var clearItem = new ToolStripMenuItem("Clear Recent Sessions List");
+            var clearItem = new ToolStripMenuItem(LanguageManager.GetString("Menu.File.ClearRecentSessions", "Clear Recent Sessions List"));
             clearItem.Click += (s, e) =>
             {
                 RecentSessionsManager.ClearRecentSessions();
@@ -1408,14 +1413,15 @@ namespace CsfStudio.UI
         private void LoadRecentSession(RecentSessionItem recentSession)
         {
             if (!ConfirmSaveIfModified()) return;
-            if (recentSession == null || recentSession.Files.Count == 0) return;
-
             var missingFiles = recentSession.Files.Where(f => !File.Exists(f.FilePath)).ToList();
             if (missingFiles.Count > 0)
             {
                 string missingList = string.Join("\n", missingFiles.Select(f => f.FilePath));
-                MessageBox.Show($"Cannot open recent session. The following CSF file(s) no longer exist:\n{missingList}",
-                    "File Not Found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Msg.CannotOpenRecentSessionFormat", "Cannot open recent session. The following CSF file(s) no longer exist:\n{0}"), missingList),
+                    LanguageManager.GetString("Title.FileNotFound", "File Not Found"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
                 return;
             }
 
@@ -1463,7 +1469,11 @@ namespace CsfStudio.UI
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error opening recent session:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Msg.ErrorOpeningRecentSessionFormat", "Error opening recent session:\n{0}"), ex.Message),
+                    LanguageManager.GetString("Title.Error", "Error"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
         }
 
@@ -1476,7 +1486,7 @@ namespace CsfStudio.UI
             if (_saveNotifyTimer == null)
             {
                 _saveNotifyTimer = new Timer();
-                _saveNotifyTimer.Interval = Math.Max(1000, _appConfig.NotificationToastDurationMs);
+                _saveNotifyTimer.Interval = Math.Max(1000, _appConfig != null ? _appConfig.NotificationToastDurationMs : 5000);
                 _saveNotifyTimer.Tick += (s, e) =>
                 {
                     _saveNotifyTimer.Stop();
@@ -1504,7 +1514,7 @@ namespace CsfStudio.UI
         {
             if (_appConfig.AutoCreateBackups && _session.Documents.Any(d => d.IsModified))
             {
-                BackupManager.CreateSessionSnapshot(_session, "Save All Documents", _appConfig.BackupDirectoryPath, _appConfig.SaveInAppData);
+                BackupManager.CreateSessionSnapshot(_session, LanguageManager.GetString("Backup.Cause.SaveAllDocuments", "Save All Documents"), _appConfig.BackupDirectoryPath);
             }
 
             int count = 0;
@@ -1536,7 +1546,7 @@ namespace CsfStudio.UI
 
             if (success)
             {
-                ShowSaveNotification($"💾 Saved all {count} open CSF file(s) successfully! ({DateTime.Now:HH:mm:ss})");
+                ShowSaveNotification(string.Format(LanguageManager.GetString("Toast.SavedAllFilesFormat", "💾 Saved all {0} open CSF file(s) successfully! ({1:HH:mm:ss})"), count, DateTime.Now));
             }
             return success;
         }
@@ -1549,8 +1559,8 @@ namespace CsfStudio.UI
             {
                 using (var dlg = new SaveFileDialog())
                 {
-                    dlg.Filter = "Command & Conquer String Table (*.csf)|*.csf";
-                    dlg.Title = $"Save CSF File [{sDoc.LanguageTag}]";
+                    dlg.Filter = LanguageManager.GetString("Filter.CsfFilesOnly", "Command & Conquer String Table (*.csf)|*.csf");
+                    dlg.Title = string.Format(LanguageManager.GetString("MainForm.SaveCsfTitleFormat", "Save CSF File [{0}]"), sDoc.LanguageTag);
                     dlg.FileName = sDoc.FileName;
                     if (dlg.ShowDialog() != DialogResult.OK) return false;
 
@@ -1560,46 +1570,24 @@ namespace CsfStudio.UI
 
             try
             {
-                if (_appConfig.AutoCreateBackups && !skipSessionBackup && File.Exists(sDoc.FilePath))
+                if (!skipSessionBackup && _appConfig.AutoCreateBackups)
                 {
-                    try
-                    {
-                        BackupManager.CreateSessionSnapshot(_session, $"Save [{sDoc.LanguageTag}]", _appConfig.BackupDirectoryPath, _appConfig.SaveInAppData);
-                    }
-                    catch
-                    {
-                        // Backup failure is non-fatal — proceed with the actual save.
-                    }
+                    BackupManager.CreateSessionSnapshot(_session, string.Format(LanguageManager.GetString("Backup.Cause.SaveSingleFileFormat", "Save [{0}]"), sDoc.LanguageTag));
                 }
 
                 CsfFileHandler.Save(sDoc.Document, sDoc.FilePath);
                 sDoc.IsModified = false;
-                if (!string.IsNullOrEmpty(sDoc.LanguageTag))
-                {
-                    _modifiedKeyMap.RemoveWhere(k => k.StartsWith($"{sDoc.LanguageTag}:", StringComparison.OrdinalIgnoreCase));
-                    _modifiedKeyNames.RemoveWhere(k => !_modifiedKeyMap.Any(m => m.EndsWith($":{k}", StringComparison.OrdinalIgnoreCase)));
-                    _currentlyRenderedMasterKeyNames.Clear();
-                }
-                if (!_session.Documents.Any(d => d.IsModified))
-                {
-                    _modifiedKeyNames.Clear();
-                    _modifiedKeyMap.Clear();
-                    _addedKeyNames.Clear();
-                    _deletedKeyNames.Clear();
-                    _reorderedKeyDetails.Clear();
-                }
+
                 if (!deferUiRefresh)
                 {
                     UpdateUIForSessionMode();
                     RebuildCategoryTreeAndGrid();
-                    PopulateBackupsTab();
-                    RefreshActiveSelectionInspector();
                 }
 
                 if (!suppressSingleNotification)
                 {
                     string fname = string.IsNullOrEmpty(sDoc.FileName) ? "CSF file" : sDoc.FileName;
-                    ShowSaveNotification($"💾 Saved [{sDoc.LanguageTag}] {fname} successfully! ({DateTime.Now:HH:mm:ss})");
+                    ShowSaveNotification(string.Format(LanguageManager.GetString("Toast.SavedSingleFileFormat", "💾 Saved [{0}] {1} successfully! ({2:HH:mm:ss})"), sDoc.LanguageTag, fname, DateTime.Now));
                 }
                 return true;
             }
@@ -1607,8 +1595,8 @@ namespace CsfStudio.UI
             {
                 // File is read-only or in a protected directory — offer Save As.
                 var choice = MessageBox.Show(
-                    $"Cannot save [{sDoc.LanguageTag}] — access denied:\n{sDoc.FilePath}\n\n{ex.Message}\n\nDo you want to save to a different location?",
-                    "Save Error – Access Denied",
+                    string.Format(LanguageManager.GetString("Msg.CannotSaveAccessDeniedFormat", "Cannot save [{0}] — access denied:\n{1}\n\n{2}\n\nDo you want to save to a different location?"), sDoc.LanguageTag, sDoc.FilePath, ex.Message),
+                    LanguageManager.GetString("Title.SaveErrorAccessDenied", "Save Error – Access Denied"),
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning);
 
@@ -1627,7 +1615,11 @@ namespace CsfStudio.UI
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error saving [{sDoc.LanguageTag}]:\n{ex.Message}", "Save Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Msg.ErrorSavingDocFormat", "Error saving [{0}]:\n{1}"), sDoc.LanguageTag, ex.Message),
+                    LanguageManager.GetString("Title.SaveError", "Save Error"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
                 if (!deferUiRefresh) UpdateUIForSessionMode();
                 return false;
             }
@@ -1639,8 +1631,11 @@ namespace CsfStudio.UI
             bool anyModified = _session.Documents.Any(d => d.IsModified);
             if (!anyModified) return true;
 
-            var res = MessageBox.Show("You have unsaved changes in the active session. Do you want to save them before continuing?",
-                "Unsaved Changes", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+            var res = MessageBox.Show(
+                LanguageManager.GetString("Msg.ConfirmSaveUnsavedChanges", "You have unsaved changes in the active session. Do you want to save them before continuing?"),
+                LanguageManager.GetString("Title.UnsavedChanges", "Unsaved Changes"),
+                MessageBoxButtons.YesNoCancel,
+                MessageBoxIcon.Question);
 
             if (res == DialogResult.Yes) return SaveAllDocuments();
             return res == DialogResult.No;
@@ -1709,7 +1704,7 @@ namespace CsfStudio.UI
                     _backupScanHasSnapshots = false;
                     try
                     {
-                        var snaps = BackupManager.GetAvailableSnapshots(_session.BaseDocument.FilePath, _appConfig.BackupDirectoryPath, _appConfig.SaveInAppData);
+                        var snaps = BackupManager.GetAvailableSnapshots(_session.BaseDocument.FilePath, _appConfig.BackupDirectoryPath);
                         _backupScanHasSnapshots = snaps != null && snaps.Count > 0;
                     }
                     catch { }
@@ -1807,7 +1802,12 @@ namespace CsfStudio.UI
                 if (sep7 != null) sep7.Visible = showStatusFilter;
             }
 
-            lblSessionMode.Text = !hasDocs ? "Mode: No Files Loaded" : (!isMulti ? "Mode: Single-CSF (1 File)" : $"Mode: Multi-CSF Session ({_session.Documents.Count} Files)");
+            string modeText;
+            if (!hasDocs) modeText = LanguageManager.GetString("Status.ModeNoFiles", "Mode: No Files Loaded");
+            else if (!isMulti) modeText = LanguageManager.GetString("Status.ModeSingle", "Mode: Single-CSF (1 File)");
+            else modeText = string.Format(LanguageManager.GetString("Status.ModeMulti", "Mode: Multi-CSF Session ({0} Files)"), _session.Documents.Count);
+
+            lblSessionMode.Text = modeText;
             lblSessionMode.ForeColor = !hasDocs ? Color.DimGray : (!isMulti ? Color.DarkBlue : Color.DarkGreen);
 
             if (cboFileFilter != null)
@@ -1829,7 +1829,7 @@ namespace CsfStudio.UI
                 {
                     if (isMulti)
                     {
-                        cboFileFilter.Items.Add("📁 All Open Files");
+                        cboFileFilter.Items.Add(LanguageManager.GetString("FileFilter.AllFiles", "📁 All Open Files"));
 
                         // A new session starts focused on Documents[0], the base CSF.
                         // Keep an existing explicit choice, including All Open Files.
@@ -1920,14 +1920,16 @@ namespace CsfStudio.UI
 
             string status = anyModified ? "*" : "";
             string docName = hasDocs ? Path.GetFileName(_session.Documents[0].FilePath) : null;
+            string subtitle = LanguageManager.GetString("App.Subtitle", "Another C&C CSF String Table Editor");
+            string baseTitle = $"{CsfStudio.AppInfo.Title} v{CsfStudio.AppInfo.Version} ({subtitle})";
 
             if (!string.IsNullOrEmpty(docName))
             {
-                this.Text = $"{status}{docName} - {CsfStudio.AppInfo.WindowTitle}";
+                this.Text = $"{status}{docName} - {baseTitle}";
             }
             else
             {
-                this.Text = $"{status}{CsfStudio.AppInfo.WindowTitle}";
+                this.Text = $"{status}{baseTitle}";
             }
 
             bool isSingleDoc = _session != null && _session.Documents.Count == 1;
@@ -2129,10 +2131,10 @@ namespace CsfStudio.UI
                     if (affectsDisplayedDoc)
                     {
                         bool exists = row.ValuesPerLanguage.TryGetValue(changedDoc.LanguageTag, out var entry) && entry != null;
-                        string val = exists ? (entry.Value ?? string.Empty) : "[Missing Entry]";
+                        string val = exists ? (entry.Value ?? string.Empty) : LanguageManager.GetString("Grid.Status.MissingEntry", "[Missing Entry]");
                         for (int c = firstValueColIdx; c < gridLabels.Columns.Count; c++)
                         {
-                            if (gridLabels.Columns[c].HeaderText == "String Value")
+                            if (gridLabels.Columns[c].HeaderText == "String Value" || gridLabels.Columns[c].HeaderText == LanguageManager.GetString("Grid.Column.Value", "String Value"))
                             {
                                 r.Cells[c].Value = val;
                                 break;
@@ -2157,7 +2159,7 @@ namespace CsfStudio.UI
                             var docLbl = changedDoc.Document?.Labels?.FirstOrDefault(l => string.Equals(l.Name, keyName, StringComparison.OrdinalIgnoreCase));
                             string cellVal = (docLbl != null && docLbl.Strings.Count > 0)
                                 ? (docLbl.Strings[0].Value ?? string.Empty)
-                                : "[Missing Entry]";
+                                : LanguageManager.GetString("Grid.Status.MissingEntry", "[Missing Entry]");
                             r.Cells[colIdx].Value = cellVal;
                         }
                         break;
@@ -2289,7 +2291,7 @@ namespace CsfStudio.UI
                                 {
                                     string header = gridLabels.Columns[c].HeaderText;
                                     string colName = gridLabels.Columns[c].Name;
-                                    if (header == "String Value" || colName == "colVal" || colName == "colValue")
+                                    if (header == "String Value" || header == LanguageManager.GetString("Grid.Column.Value", "String Value") || colName == "colVal" || colName == "colValue")
                                     {
                                         r.Cells[c].Value = val ?? string.Empty;
                                         break;
@@ -2310,7 +2312,7 @@ namespace CsfStudio.UI
                                         }
                                         else
                                         {
-                                            r.Cells[colIdx].Value = "[Missing Entry]";
+                                            r.Cells[colIdx].Value = LanguageManager.GetString("Grid.Status.MissingEntry", "[Missing Entry]");
                                         }
                                     }
                                 }
@@ -2367,7 +2369,8 @@ namespace CsfStudio.UI
 
                 tvCategories.Nodes.Clear();
 
-                var rootNode = tvCategories.Nodes.Add($"📁 All Labels ({searchFilteredRows.Count})");
+                string allLabelsTitle = LanguageManager.GetString("Grid.Category.All", "[All Labels]").Trim('[', ']');
+                var rootNode = tvCategories.Nodes.Add($"📁 {allLabelsTitle} ({searchFilteredRows.Count})");
                 rootNode.Tag = "[All Labels]";
 
                 TreeNode nodeToSelect = rootNode;
@@ -2409,7 +2412,7 @@ namespace CsfStudio.UI
                 gridLabels.Rows.Clear();
                 gridLabels.Columns.Clear();
                 _masterGridColumnSignature = null;
-                lblStatusCount.Text = "No CSF file loaded";
+                lblStatusCount.Text = LanguageManager.GetString("MainForm.StatusNoCsfLoaded", "No CSF file loaded");
                 ClearDetailInspector();
                 return;
             }
@@ -2726,18 +2729,20 @@ namespace CsfStudio.UI
 
             var colStatus = new DataGridViewTextBoxColumn
             {
+                Name = "colStatus",
                 HeaderText = "",
                 AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
                 Width = 22,
                 Resizable = DataGridViewTriState.False,
-                ToolTipText = "Synchronization & Text Status:\n🟢 Complete (Valid text)\n🟡 Empty (Blank text in some/all files)\n🔴 Missing (Key missing in some files)",
+                ToolTipText = LanguageManager.GetString("ToolTip.GridColStatus", "Synchronization & Text Status:\n🟢 Complete (Valid text)\n🟡 Empty (Blank text in some/all files)\n🔴 Missing (Key missing in some files)"),
                 ReadOnly = true
             };
             colStatus.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
 
             var colKey = new DataGridViewTextBoxColumn
             {
-                HeaderText = "Key",
+                Name = "colKey",
+                HeaderText = LanguageManager.GetString("Grid.Column.Key", "Key"),
                 Width = 220,
                 MinimumWidth = 220,
                 AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
@@ -2755,11 +2760,12 @@ namespace CsfStudio.UI
                 {
                     var colIndex = new DataGridViewTextBoxColumn
                     {
-                        HeaderText = "#",
+                        Name = "colIndex",
+                        HeaderText = LanguageManager.GetString("Grid.Column.Index", "#"),
                         Width = 45,
                         AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
                         ReadOnly = true,
-                        ToolTipText = $"Index position of entry in {targetDisplayName} (1-based)"
+                        ToolTipText = string.Format(LanguageManager.GetString("ToolTip.GridColIndexFormat", "Index position of entry in {0} (1-based)"), targetDisplayName)
                     };
                     colIndex.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
                     gridLabels.Columns.Add(colIndex);
@@ -2770,15 +2776,17 @@ namespace CsfStudio.UI
 
                 var colVal = new DataGridViewTextBoxColumn
                 {
-                    HeaderText = "String Value",
-                    ToolTipText = $"String text value in {targetDisplayName}",
+                    Name = "colVal",
+                    HeaderText = LanguageManager.GetString("Grid.Column.Value", "String Value"),
+                    ToolTipText = string.Format(LanguageManager.GetString("ToolTip.GridColValueFormat", "String text value in {0}"), targetDisplayName),
                     AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
                     ReadOnly = true
                 };
                 var colExtra = new DataGridViewTextBoxColumn
                 {
-                    HeaderText = "Extra Sound",
-                    ToolTipText = $"Extra sound filename/data in {targetDisplayName}",
+                    Name = "colExtra",
+                    HeaderText = LanguageManager.GetString("Grid.Column.ExtraValue", "Extra Sound"),
+                    ToolTipText = string.Format(LanguageManager.GetString("ToolTip.GridColExtraFormat", "Extra sound filename/data in {0}"), targetDisplayName),
                     Width = 110,
                     AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
                     ReadOnly = true
@@ -2796,7 +2804,9 @@ namespace CsfStudio.UI
                     string fname = string.IsNullOrEmpty(sDoc.FileName) ? "strings.csf" : sDoc.FileName;
                     string prefixLabel = !string.IsNullOrWhiteSpace(sDoc.LanguageTag) ? $"[{sDoc.LanguageTag}] " : "";
                     string headerTitle = $"{prefixLabel}{fname}";
-                    string info = string.IsNullOrEmpty(sDoc.FilePath) ? $"File: {headerTitle}" : $"File: {headerTitle}\nPath: {sDoc.FilePath}";
+                    string fileLbl = LanguageManager.GetString("ToolTip.GridColFile", "File:");
+                    string pathLbl = LanguageManager.GetString("ToolTip.GridColPath", "Path:");
+                    string info = string.IsNullOrEmpty(sDoc.FilePath) ? $"{fileLbl} {headerTitle}" : $"{fileLbl} {headerTitle}\n{pathLbl} {sDoc.FilePath}";
                     gridLabels.Columns.Add(new DataGridViewTextBoxColumn
                     {
                         HeaderText = headerTitle,
@@ -2879,7 +2889,7 @@ namespace CsfStudio.UI
                     }
                     else
                     {
-                        string missingText = "[Missing Entry]";
+                        string missingText = LanguageManager.GetString("Grid.Status.MissingEntry", "[Missing Entry]");
                         if (showIndexCol)
                         {
                             gridRow.CreateCells(gridLabels, idxDisplay, "🔴", row.KeyName, missingText, "-");
@@ -2901,7 +2911,7 @@ namespace CsfStudio.UI
                     {
                         cellValues[d + 2] = row.ValuesPerLanguage.TryGetValue(_session.Documents[d].LanguageTag, out var entry)
                             ? (object)(entry?.Value ?? string.Empty)
-                            : "[Missing Entry]";
+                            : LanguageManager.GetString("Grid.Status.MissingEntry", "[Missing Entry]");
                     }
                     gridRow.CreateCells(gridLabels, cellValues);
                 }
@@ -2951,7 +2961,7 @@ namespace CsfStudio.UI
                 }
             }
 
-            lblStatusCount.Text = $"Visible keys: {filteredRows.Count} of {masterRows.Count}";
+            lblStatusCount.Text = string.Format(LanguageManager.GetString("Status.VisibleKeys", "Visible keys: {0} of {1}"), filteredRows.Count, masterRows.Count);
 
             // Any new populate cancels an in-flight stream.
             int streamToken = ++_rowStreamToken;
@@ -3566,9 +3576,9 @@ namespace CsfStudio.UI
                 Height = 32
             };
 
-            var lblKey = new Label { Text = "Key:", Location = new Point(10, 8), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
+            var lblKey = new Label { Text = LanguageManager.GetString("Inspector.KeyLabel", "Key:"), Location = new Point(10, 8), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
             var txtKey = new TextBox { Text = row.KeyName, Location = new Point(45, 5), Width = 220, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
-            var btnRen = new Button { Text = "✏️ Rename", Location = new Point(272, 4), Width = 80, Height = 23 };
+            var btnRen = new Button { Text = LanguageManager.GetString("Inspector.RenameButton", "✏️ Rename"), Location = new Point(272, 4), Width = 80, Height = 23 };
 
             string oldKey = row.KeyName;
             Action doRename = () =>
@@ -3703,7 +3713,9 @@ namespace CsfStudio.UI
 
             pnlBaseContainer.Controls.Add(pnlBaseHeader);
 
-            string bToolTip = ToolTipHelper.WrapText($"Label: {baseLangTag}\nFile: {(string.IsNullOrEmpty(baseDoc.FilePath) ? "Unsaved In-Memory Document" : Path.GetFileName(baseDoc.FilePath))}\nPath: {(string.IsNullOrEmpty(baseDoc.FilePath) ? "-" : baseDoc.FilePath)}\nLength: {baseText.Length} chars", 45);
+            string unsavedText = LanguageManager.GetString("Inspector.UnsavedInMemoryDoc", "Unsaved In-Memory Document");
+            string bFilePath = string.IsNullOrEmpty(baseDoc.FilePath) ? unsavedText : baseDoc.FilePath;
+            string bToolTip = ToolTipHelper.WrapText(string.Format(LanguageManager.GetString("ToolTip.Inspector.DocInfoFormat", "Label: {0}\nFile: {1}\nPath: {2}\nLength: {3} chars"), baseLangTag, Path.GetFileName(bFilePath), string.IsNullOrEmpty(baseDoc.FilePath) ? "-" : bFilePath, baseText.Length), 45);
             _toolTip.SetToolTip(pnlBaseHeader, bToolTip);
 
             if (!baseExists)
@@ -3965,30 +3977,31 @@ namespace CsfStudio.UI
                     string targetText = exists ? entry.Value : string.Empty;
 
                     string statusKey = "COMPLETE";
-                    string statusTip = "🟢 Complete Key: Valid text present in file";
+                    string statusTip = LanguageManager.GetString("ToolTip.Inspector.StatusComplete", "🟢 Complete Key: Valid text present in file");
 
                     if (!exists)
                     {
                         statusKey = "MISSING";
-                        statusTip = $"🔴 Missing Key: Label '{row.KeyName}' does not exist in [{targetTag}]";
+                        statusTip = string.Format(LanguageManager.GetString("ToolTip.Inspector.StatusMissingFormat", "🔴 Missing Key: Label '{0}' is missing in [{1}]"), row.KeyName, targetTag);
                     }
                     else if (string.IsNullOrEmpty(targetText))
                     {
                         statusKey = "EMPTY";
-                        statusTip = $"🟡 Empty Text: Key exists in [{targetTag}], but string text is blank";
+                        statusTip = string.Format(LanguageManager.GetString("ToolTip.Inspector.StatusEmptyFormat", "🟡 Empty Text: Key exists in [{0}], but text is blank"), targetTag);
                     }
                     else if (IsKeyModifiedInDoc(targetTag, row.KeyName))
                     {
                         statusKey = "MODIFIED";
-                        statusTip = $"🔵 Unsaved Changes in [{targetTag}]";
+                        statusTip = string.Format(LanguageManager.GetString("ToolTip.Inspector.StatusModifiedFormat", "🔵 Unsaved Changes in [{0}]"), targetTag);
                     }
 
                     var tagInfo = new TabPageTagInfo { LanguageTag = targetTag, StatusKey = statusKey };
+                    string fileLbl = LanguageManager.GetString("ToolTip.GridColFile", "File:");
 
                     var targetPage = new TabPage
                     {
                         Text        = targetTag,
-                        ToolTipText = $"{statusTip}\nFile: {sDoc.FileName}",
+                        ToolTipText = $"{statusTip}\n{fileLbl} {sDoc.FileName}",
                         Tag         = tagInfo,
                         BackColor   = Color.White
                     };
@@ -4179,8 +4192,8 @@ namespace CsfStudio.UI
                     foreach (var row in unsavedRows)
                     {
                         string changeStatus = _addedKeyNames.Contains(row.KeyName)
-                            ? "Created"
-                            : (_reorderedKeyDetails.TryGetValue(row.KeyName, out var reorderDesc) ? reorderDesc : "Modified");
+                            ? LanguageManager.GetString("Grid.Status.Created", "Created")
+                            : (_reorderedKeyDetails.TryGetValue(row.KeyName, out var reorderDesc) ? reorderDesc : LanguageManager.GetString("Grid.Status.Modified", "Modified"));
                         string modTime = _recentKeyTimestamps.TryGetValue(row.KeyName, out var dt)
                             ? dt.ToString("yyyy-MM-dd HH:mm:ss")
                             : DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
@@ -4210,7 +4223,7 @@ namespace CsfStudio.UI
                     int idx = gridUnsaved.Rows.Add(
                         deletedKey,
                         dummyRow.Category,
-                        "Deleted",
+                        LanguageManager.GetString("Grid.Status.Deleted", "Deleted"),
                         modTime
                     );
                     gridUnsaved.Rows[idx].Tag = dummyRow;
@@ -4264,23 +4277,33 @@ namespace CsfStudio.UI
                 {
                     _chkShowFullCoverage = new CheckBox
                     {
-                        Text = "Show 100% complete keys",
+                        Text = LanguageManager.GetString("Coverage.ChkShowFull", "Show 100% complete keys"),
                         AutoSize = true,
                         Checked = false
                     };
                     _chkShowFullCoverage.CheckedChanged += (s, e) => PopulateCoverageMatrixTab();
                 }
+                else
+                {
+                    _chkShowFullCoverage.Text = LanguageManager.GetString("Coverage.ChkShowFull", "Show 100% complete keys");
+                }
+                ToolTipHelper.SetToolTip(_toolTip, _chkShowFullCoverage, LanguageManager.GetString("ToolTip.Coverage.ShowFull", "Show 100% Complete Keys: When enabled, includes keys that have valid non-empty translations across all open CSF documents. When disabled, hides fully translated keys to focus on missing translations."));
 
                 if (_chkShowEmptyEntries == null)
                 {
                     _chkShowEmptyEntries = new CheckBox
                     {
-                        Text = "Show 0% empty entries",
+                        Text = LanguageManager.GetString("Coverage.ChkShowEmpty", "Show 0% empty entries"),
                         AutoSize = true,
                         Checked = false
                     };
                     _chkShowEmptyEntries.CheckedChanged += (s, e) => PopulateCoverageMatrixTab();
                 }
+                else
+                {
+                    _chkShowEmptyEntries.Text = LanguageManager.GetString("Coverage.ChkShowEmpty", "Show 0% empty entries");
+                }
+                ToolTipHelper.SetToolTip(_toolTip, _chkShowEmptyEntries, LanguageManager.GetString("ToolTip.Coverage.ShowEmpty", "Show 0% Empty Entries: When enabled, includes keys that have no text content across all open CSF documents. When disabled, hides completely empty keys."));
 
                 bool showFullCoverage = _chkShowFullCoverage.Checked;
                 bool showEmptyEntries = _chkShowEmptyEntries.Checked;
@@ -4327,9 +4350,15 @@ namespace CsfStudio.UI
                     double pct = totalKeysEvaluated > 0 ? (presentCount * 100.0) / totalKeysEvaluated : 100.0;
                     bool isFilterActive = string.Equals(_selectedCoverageFilterFileTag, langTag, StringComparison.OrdinalIgnoreCase);
 
+                    string filterPrefix = LanguageManager.GetString("Coverage.FilterPrefixFormat", "🔍 FILTER: {0}");
+                    string baseTagStr = LanguageManager.GetString("Coverage.BaseCsfTag", "📌 Base CSF");
+                    string cardTitle = isFilterActive
+                        ? string.Format(filterPrefix, langTag)
+                        : $"{langTag} {(sDoc == _session.BaseDocument ? baseTagStr : "")}";
+
                     var grpCard = new GroupBox
                     {
-                        Text = isFilterActive ? $"🔍 FILTER: {langTag}" : $"{langTag} {(sDoc == _session.BaseDocument ? "📌 Base CSF" : "")}",
+                        Text = cardTitle,
                         Size = new Size(215, 68),
                         Margin = new Padding(4),
                         Cursor = Cursors.Hand,
@@ -4347,14 +4376,20 @@ namespace CsfStudio.UI
                         Cursor = Cursors.Hand
                     };
 
+                    string statsFormat = LanguageManager.GetString("Coverage.StatsFormat", "{0}/{1} ({2:F1}%) | Missing: {3}");
                     var lblStats = new Label
                     {
-                        Text = $"{presentCount}/{totalKeysEvaluated} ({pct:F1}%) | Missing: {missingCount}",
+                        Text = string.Format(statsFormat, presentCount, totalKeysEvaluated, pct, missingCount),
                         Location = new Point(10, 42),
                         AutoSize = true,
                         ForeColor = missingCount > 0 ? Color.DarkRed : Color.DarkGreen,
                         Cursor = Cursors.Hand
                     };
+
+                    string cardTip = string.Format(LanguageManager.GetString("ToolTip.Coverage.LanguageCard", "Language Coverage: Click this card to filter and display only keys that are missing or empty in '{0}'. Click again to remove the filter."), langTag);
+                    ToolTipHelper.SetToolTip(_toolTip, grpCard, cardTip);
+                    ToolTipHelper.SetToolTip(_toolTip, pBar, cardTip);
+                    ToolTipHelper.SetToolTip(_toolTip, lblStats, cardTip);
 
                     void ToggleFilter(object sender, EventArgs args)
                     {
@@ -4403,8 +4438,10 @@ namespace CsfStudio.UI
 
                 if (!string.IsNullOrEmpty(_selectedCoverageFilterFileTag))
                 {
-                    _lblCoverageFilterInfo.Text = $"🔍 Missing in '{_selectedCoverageFilterFileTag}'";
+                    _lblCoverageFilterInfo.Text = string.Format(LanguageManager.GetString("Coverage.MissingInTagFormat", "🔍 Missing in '{0}'"), _selectedCoverageFilterFileTag);
                     _lblCoverageFilterInfo.Location = new Point(8, 54);
+                    string activeFilterTip = string.Format(LanguageManager.GetString("ToolTip.Coverage.FilterActive", "Active Filter: Currently displaying only keys that are missing or incomplete in '{0}'. Click the language card above to clear this filter."), _selectedCoverageFilterFileTag);
+                    ToolTipHelper.SetToolTip(_toolTip, _lblCoverageFilterInfo, activeFilterTip);
                     pnlSubHeader.Controls.Add(_lblCoverageFilterInfo);
                 }
 
@@ -4431,7 +4468,7 @@ namespace CsfStudio.UI
                             presentInFiles++;
                             if (isLangModified)
                             {
-                                fileBadges.Add($"✏️ {sDoc.LanguageTag} (modified)");
+                                fileBadges.Add(string.Format(LanguageManager.GetString("Coverage.BadgeModifiedFormat", "✏️ {0} (modified)"), sDoc.LanguageTag));
                             }
                             else
                             {
@@ -4442,16 +4479,16 @@ namespace CsfStudio.UI
                         {
                             if (isLangModified)
                             {
-                                fileBadges.Add($"✏️ {sDoc.LanguageTag} (empty, modified)");
+                                fileBadges.Add(string.Format(LanguageManager.GetString("Coverage.BadgeEmptyModifiedFormat", "✏️ {0} (empty, modified)"), sDoc.LanguageTag));
                             }
                             else
                             {
-                                fileBadges.Add($"{sDoc.LanguageTag} (empty)");
+                                fileBadges.Add(string.Format(LanguageManager.GetString("Coverage.BadgeEmptyFormat", "{0} (empty)"), sDoc.LanguageTag));
                             }
                         }
                         else
                         {
-                            fileBadges.Add($"[Missing: {sDoc.LanguageTag}]");
+                            fileBadges.Add(string.Format(LanguageManager.GetString("Coverage.BadgeMissingFormat", "[Missing: {0}]"), sDoc.LanguageTag));
                         }
                     }
 
@@ -4474,10 +4511,10 @@ namespace CsfStudio.UI
 
                     double rowPct = (presentInFiles * 100.0) / Math.Max(1, _session.Documents.Count);
                     string statusStr = string.Join("  |  ", fileBadges);
-                    string pctStr = $"{rowPct:F0}% ({presentInFiles}/{_session.Documents.Count} files)";
+                    string pctStr = string.Format(LanguageManager.GetString("Coverage.FilesCountFormat", "{0:F0}% ({1}/{2} files)"), rowPct, presentInFiles, _session.Documents.Count);
 
                     var gRow = new DataGridViewRow();
-                    gRow.CreateCells(gridCoverage, row.KeyName, row.Category, baseText, statusStr, pctStr);
+                    gRow.CreateCells(gridCoverage, row.KeyName, statusStr, pctStr);
                     gRow.Tag = row;
 
                     coverageGridRows.Add(gRow);
@@ -4512,8 +4549,8 @@ namespace CsfStudio.UI
         private void InitializeKeyEditorTab()
         {
             if (tabKeyEditor == null) return;
-            tabKeyEditor.Text = "📋 Plain Keys View";
-            tabKeyEditor.ToolTipText = "📋 Plain Keys View: Flat key list on the left with full-screen multi-language editors on the right.";
+            tabKeyEditor.Text = LanguageManager.GetString("Tab.PlainKeyEditor", "Plain Key View");
+            tabKeyEditor.ToolTipText = LanguageManager.GetString("ToolTip.Tab.KeyEditor", "📋 Plain Keys View: Flat key list on the left with full-screen multi-language editors on the right.");
 
             splitKeyEditor = new SplitContainer
             {
@@ -4699,7 +4736,7 @@ namespace CsfStudio.UI
                 pnlKeyEditorEditors.Controls.Clear();
                 var lblEmpty = new Label
                 {
-                    Text = "👈 Select a key from the list on the left to view and edit string values.",
+                    Text = LanguageManager.GetString("Inspector.SelectKeyPlaceholder", "👈 Select a key from the list on the left to view and edit string values."),
                     Dock = DockStyle.Fill,
                     TextAlign = ContentAlignment.MiddleCenter,
                     Font = new Font("Segoe UI", 10.5f, FontStyle.Italic),
@@ -4862,9 +4899,12 @@ namespace CsfStudio.UI
                 .Where(d => d != targetDoc && row.ValuesPerLanguage.TryGetValue(d.LanguageTag, out var entry) && !string.IsNullOrEmpty(entry?.Value))
                 .ToList();
 
+            string addCopyStr = string.Format(LanguageManager.GetString("Inspector.Action.AddCopyKeyFormat", "📋 Add / Copy Key to {0}... ▾"), targetDoc.LanguageTag);
+            string addBlankStr = string.Format(LanguageManager.GetString("Inspector.Action.AddBlankKeyFormat", "➕ Add Blank Key to {0}"), targetDoc.LanguageTag);
+
             var btnCopyMenu = new Button
             {
-                Text = otherDocsWithText.Count > 0 ? $"📋 Add / Copy Key to {targetDoc.LanguageTag}... ▾" : $"➕ Add Blank Key to {targetDoc.LanguageTag}",
+                Text = otherDocsWithText.Count > 0 ? addCopyStr : addBlankStr,
                 Location = new Point(8, 5),
                 Height = 28,
                 AutoSize = true
@@ -5049,7 +5089,7 @@ namespace CsfStudio.UI
 
             if (otherDocsWithText.Count > 0)
             {
-                var lblHeader = new ToolStripMenuItem("Copy key text from open file:") { Enabled = false };
+                var lblHeader = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.CopyKeyTextFromDoc", "Copy key text from open file:")) { Enabled = false };
                 menu.Items.Add(lblHeader);
                 menu.Items.Add(new ToolStripSeparator());
 
@@ -5059,8 +5099,10 @@ namespace CsfStudio.UI
                     string preview = val.Length > 40 ? val.Substring(0, 40) + "..." : val;
                     preview = preview.Replace("\r", "").Replace("\n", " ");
 
-                    string langLabel = $"{srcDoc.LanguageTag}{(srcDoc == _session.BaseDocument ? " 📌 Base CSF" : "")}";
-                    var itemCopy = new ToolStripMenuItem($"📋 Copy from {langLabel} (\"{preview}\")");
+                    string baseSuffix = LanguageManager.GetString("Menu.ContextMenu.BaseCsfSuffix", " 📌 Base CSF");
+                    string langLabel = $"{srcDoc.LanguageTag}{(srcDoc == _session.BaseDocument ? baseSuffix : "")}";
+                    string copyFromFmt = LanguageManager.GetString("Inspector.Action.CopyFromLangFormat", "📋 Copy from {0} (\"{1}\")");
+                    var itemCopy = new ToolStripMenuItem(string.Format(copyFromFmt, langLabel, preview));
 
                     var docForAction = srcDoc;
                     itemCopy.Click += (s, e) => performAddOrCopy(docForAction);
@@ -5070,7 +5112,7 @@ namespace CsfStudio.UI
                 menu.Items.Add(new ToolStripSeparator());
             }
 
-            var itemAddBlank = new ToolStripMenuItem($"➕ Add Blank Key (Empty string)");
+            var itemAddBlank = new ToolStripMenuItem(LanguageManager.GetString("Inspector.Action.AddBlankKeyItem", "➕ Add Blank Key (Empty string)"));
             itemAddBlank.Click += (s, e) => performAddOrCopy(null);
             menu.Items.Add(itemAddBlank);
 
@@ -5119,7 +5161,7 @@ namespace CsfStudio.UI
                 Dock = DockStyle.Fill,
                 Font = new Font(FontFamily.GenericSansSerif, 8.25f, FontStyle.Regular)
             };
-            _toolTip.SetToolTip(txtAudio, $"Extra sound WAV filename for [{sDoc.LanguageTag}]");
+            ToolTipHelper.SetToolTip(_toolTip, txtAudio, string.Format(LanguageManager.GetString("ToolTip.Inspector.ExtraAudioFormat", "Extra sound WAV filename for [{0}]"), sDoc.LanguageTag));
 
             txtAudio.TextChanged += (s, e) =>
             {
@@ -5157,42 +5199,7 @@ namespace CsfStudio.UI
             return pnl;
         }
 
-        private void PlayAudioWav(string wavFileName)
-        {
-            if (string.IsNullOrWhiteSpace(wavFileName))
-            {
-                MessageBox.Show("No audio WAV filename specified for this entry.", "Audio Playback", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
 
-            try
-            {
-                string path = wavFileName;
-                if (!File.Exists(path) && _session.BaseDocument != null && !string.IsNullOrEmpty(_session.BaseDocument.FilePath))
-                {
-                    string dir = Path.GetDirectoryName(_session.BaseDocument.FilePath);
-                    string candidate = Path.Combine(dir, wavFileName);
-                    if (File.Exists(candidate)) path = candidate;
-                }
-
-                if (File.Exists(path))
-                {
-                    using (var player = new System.Media.SoundPlayer(path))
-                    {
-                        player.Play();
-                    }
-                }
-                else
-                {
-                    System.Media.SystemSounds.Asterisk.Play();
-                    MessageBox.Show($"Audio file '{wavFileName}' was not found on disk at:\n{path}", "File Not Found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error playing audio file '{wavFileName}':\n{ex.Message}", "Playback Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
 
         private void BuildSideBySideEditors(MasterKeyRow row, Control targetContainer = null)
         {
@@ -5227,7 +5234,9 @@ namespace CsfStudio.UI
                         Dock = DockStyle.Fill
                     };
 
-                    string bToolTip = ToolTipHelper.WrapText($"Label: {baseLangTag}\nFile: {(string.IsNullOrEmpty(baseDoc.FilePath) ? "Unsaved In-Memory Document" : Path.GetFileName(baseDoc.FilePath))}\nPath: {(string.IsNullOrEmpty(baseDoc.FilePath) ? "-" : baseDoc.FilePath)}\nLength: {baseText.Length} chars", 45);
+                    string unsavedTextSingle = LanguageManager.GetString("Inspector.UnsavedInMemoryDoc", "Unsaved In-Memory Document");
+                    string bFilePathSingle = string.IsNullOrEmpty(baseDoc.FilePath) ? unsavedTextSingle : baseDoc.FilePath;
+                    string bToolTip = ToolTipHelper.WrapText(string.Format(LanguageManager.GetString("ToolTip.Inspector.DocInfoFormat", "Label: {0}\nFile: {1}\nPath: {2}\nLength: {3} chars"), baseLangTag, Path.GetFileName(bFilePathSingle), string.IsNullOrEmpty(baseDoc.FilePath) ? "-" : bFilePathSingle, baseText.Length), 45);
 
                     var txtSingle = new TextBox
                     {
@@ -5382,7 +5391,9 @@ namespace CsfStudio.UI
 
                 pnlBaseContainer.Controls.Add(pnlBaseHeader);
 
-                string baseToolTipText = ToolTipHelper.WrapText($"Label: {baseLangTag}\nFile: {(string.IsNullOrEmpty(baseDoc.FilePath) ? "Unsaved In-Memory Document" : Path.GetFileName(baseDoc.FilePath))}\nPath: {(string.IsNullOrEmpty(baseDoc.FilePath) ? "-" : baseDoc.FilePath)}\nLength: {baseText.Length} chars", 45);
+                string unsavedText = LanguageManager.GetString("Inspector.UnsavedInMemoryDoc", "Unsaved In-Memory Document");
+                string bFilePath = string.IsNullOrEmpty(baseDoc.FilePath) ? unsavedText : baseDoc.FilePath;
+                string baseToolTipText = ToolTipHelper.WrapText(string.Format(LanguageManager.GetString("ToolTip.Inspector.DocInfoFormat", "Label: {0}\nFile: {1}\nPath: {2}\nLength: {3} chars"), baseLangTag, Path.GetFileName(bFilePath), string.IsNullOrEmpty(baseDoc.FilePath) ? "-" : bFilePath, baseText.Length), 45);
                 _toolTip.SetToolTip(pnlBaseHeader, baseToolTipText);
 
                 if (!baseExists)
@@ -5515,9 +5526,10 @@ namespace CsfStudio.UI
 
                     pnlUnpinnedContainer.Controls.Add(pnlHeader);
 
-                    string tFilePath = string.IsNullOrEmpty(sDoc.FilePath) ? "Unsaved In-Memory Document" : sDoc.FilePath;
+                    string unsavedTextUnpinned = LanguageManager.GetString("Inspector.UnsavedInMemoryDoc", "Unsaved In-Memory Document");
+                    string tFilePath = string.IsNullOrEmpty(sDoc.FilePath) ? unsavedTextUnpinned : sDoc.FilePath;
                     string linterDetail = CheckLinterStatusString(baseText, targetText);
-                    string colToolTipText = ToolTipHelper.WrapText($"Label: {targetTag}\nFile: {Path.GetFileName(tFilePath)}\nPath: {tFilePath}\nLength: {targetText.Length} chars\nLinter: {linterDetail}\n(Double-click header to dock back to tab group)", 45);
+                    string colToolTipText = ToolTipHelper.WrapText(string.Format(LanguageManager.GetString("ToolTip.Inspector.DocInfoWithLinterFormat", "Label: {0}\nFile: {1}\nPath: {2}\nLength: {3} chars\nLinter: {4}\n(Double-click header to dock back to tab group)"), targetTag, Path.GetFileName(tFilePath), tFilePath, targetText.Length, linterDetail), 45);
                     _toolTip.SetToolTip(pnlHeader, colToolTipText);
 
                     if (!exists)
@@ -5637,27 +5649,29 @@ namespace CsfStudio.UI
                         string targetText = exists ? entry.Value : string.Empty;
 
                         string statusKey = "COMPLETE";
-                        string statusTip = "🟢 Complete Key: Valid text present in file";
+                        string statusTip = LanguageManager.GetString("ToolTip.Inspector.StatusComplete", "🟢 Complete Key: Valid text present in file");
 
                         if (!exists)
                         {
                             statusKey = "MISSING";
-                            statusTip = $"🔴 Missing Key: Label '{row.KeyName}' is missing in [{targetTag}]";
+                            statusTip = string.Format(LanguageManager.GetString("ToolTip.Inspector.StatusMissingFormat", "🔴 Missing Key: Label '{0}' is missing in [{1}]"), row.KeyName, targetTag);
                         }
                         else if (string.IsNullOrEmpty(targetText))
                         {
                             statusKey = "EMPTY";
-                            statusTip = $"🟡 Empty Text: Key exists in [{targetTag}], but text is blank";
+                            statusTip = string.Format(LanguageManager.GetString("ToolTip.Inspector.StatusEmptyFormat", "🟡 Empty Text: Key exists in [{0}], but text is blank"), targetTag);
                         }
                         else if (IsKeyModifiedInDoc(targetTag, row.KeyName))
                         {
                             statusKey = "MODIFIED";
-                            statusTip = $"🔵 Unsaved Changes in [{targetTag}]";
+                            statusTip = string.Format(LanguageManager.GetString("ToolTip.Inspector.StatusModifiedFormat", "🔵 Unsaved Changes in [{0}]"), targetTag);
                         }
 
-                        string tFilePath = string.IsNullOrEmpty(sDoc.FilePath) ? "Unsaved In-Memory Document" : sDoc.FilePath;
+                        string unsavedTextPinned = LanguageManager.GetString("Inspector.UnsavedInMemoryDoc", "Unsaved In-Memory Document");
+                        string tFilePath = string.IsNullOrEmpty(sDoc.FilePath) ? unsavedTextPinned : sDoc.FilePath;
                         string linterDetail = CheckLinterStatusString(baseText, targetText);
-                        string tabToolTipText = $"{statusTip}\nLabel: {targetTag}\nFile: {Path.GetFileName(tFilePath)}\nPath: {tFilePath}\nLength: {targetText.Length} chars\nLinter: {linterDetail}";
+                        string infoDetails = string.Format(LanguageManager.GetString("ToolTip.Inspector.DocInfoWithLinterFormatNoDock", "Label: {0}\nFile: {1}\nPath: {2}\nLength: {3} chars\nLinter: {4}"), targetTag, Path.GetFileName(tFilePath), tFilePath, targetText.Length, linterDetail);
+                        string tabToolTipText = $"{statusTip}\n{infoDetails}";
 
                         var tagInfo = new TabPageTagInfo { LanguageTag = targetTag, StatusKey = statusKey };
 
@@ -5704,6 +5718,7 @@ namespace CsfStudio.UI
                                 }
                             };
 
+                            txtTarget.ContextMenuStrip = CreateTargetContextMenu(sDoc, targetTag, row, txtTarget);
                             tabPg.Controls.Add(txtTarget);
                             var pnlTargetAudio = CreateDocAudioPanel(sDoc, row, () => UpdateFormTitle());
                             tabPg.Controls.Add(pnlTargetAudio);
@@ -5919,7 +5934,11 @@ namespace CsfStudio.UI
             }
 
             RebuildCategoryTreeAndGrid();
-            MessageBox.Show($"Massively synchronized extra audio WAV filenames for {count} entries from [{srcLangTag}] to all other open CSF files.", "Audio Synchronization Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(
+                string.Format(LanguageManager.GetString("Msg.AudioSyncCompletedFormat", "Massively synchronized extra audio WAV filenames for {0} entries from [{1}] to all other open CSF files."), count, srcLangTag),
+                LanguageManager.GetString("Title.AudioSyncComplete", "Audio Synchronization Complete"),
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
 
         private void PromptRenameFileLabel(CsfSessionDocument sDoc)
@@ -5929,7 +5948,7 @@ namespace CsfStudio.UI
 
             using (var dlg = new Form())
             {
-                dlg.Text = "Edit File Label / Tag";
+                dlg.Text = LanguageManager.GetString("RenameLabel.Title", "Edit File Label / Tag");
                 dlg.Size = new Size(380, 160);
                 dlg.StartPosition = FormStartPosition.CenterParent;
                 dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -5939,7 +5958,7 @@ namespace CsfStudio.UI
 
                 var lblPrompt = new Label
                 {
-                    Text = $"Enter a new Label identifier for '{sDoc.FileName}':",
+                    Text = string.Format(LanguageManager.GetString("RenameLabel.PromptFormat", "Enter a new Label identifier for '{0}':"), sDoc.FileName),
                     Location = new Point(15, 15),
                     AutoSize = true
                 };
@@ -5953,7 +5972,7 @@ namespace CsfStudio.UI
 
                 var btnOk = new Button
                 {
-                    Text = "OK",
+                    Text = LanguageManager.GetString("Button.OK", "OK"),
                     DialogResult = DialogResult.OK,
                     Location = new Point(175, 78),
                     Width = 80,
@@ -5962,7 +5981,7 @@ namespace CsfStudio.UI
 
                 var btnCancel = new Button
                 {
-                    Text = "Cancel",
+                    Text = LanguageManager.GetString("Button.Cancel", "Cancel"),
                     DialogResult = DialogResult.Cancel,
                     Location = new Point(265, 78),
                     Width = 80,
@@ -5981,7 +6000,11 @@ namespace CsfStudio.UI
                     string newLabel = txtLabel.Text.Trim();
                     if (string.IsNullOrWhiteSpace(newLabel))
                     {
-                        MessageBox.Show("File Label cannot be blank.", "Invalid Label", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show(
+                            LanguageManager.GetString("Msg.FileLabelBlank", "File Label cannot be blank."),
+                            LanguageManager.GetString("Title.InvalidLabel", "Invalid Label"),
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
                         return;
                     }
 
@@ -5992,8 +6015,11 @@ namespace CsfStudio.UI
 
                     if (_session.Documents.Any(d => d != sDoc && string.Equals(d.LanguageTag, newLabel, StringComparison.OrdinalIgnoreCase)))
                     {
-                        MessageBox.Show($"A file with the label '{newLabel}' already exists in this session. All file labels must be unique.",
-                            "Duplicate File Label", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        MessageBox.Show(
+                            string.Format(LanguageManager.GetString("Msg.DuplicateFileLabelFormat", "A file with the label '{0}' already exists in this session. All file labels must be unique."), newLabel),
+                            LanguageManager.GetString("Title.DuplicateFileLabel", "Duplicate File Label"),
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
                         return;
                     }
 
@@ -6001,7 +6027,11 @@ namespace CsfStudio.UI
                     sDoc.IsModified = true;
                     OnSessionUpdated();
                     RebuildCategoryTreeAndGrid();
-                    MessageBox.Show($"Updated file label to '{newLabel}'.", "Label Updated", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(
+                        string.Format(LanguageManager.GetString("Msg.UpdatedFileLabelFormat", "Updated file label to '{0}'."), newLabel),
+                        LanguageManager.GetString("Title.LabelUpdated", "Label Updated"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
                 }
             }
         }
@@ -6013,7 +6043,7 @@ namespace CsfStudio.UI
 
             using (var dlg = new Form())
             {
-                dlg.Text = $"Select Language - '{sDoc.FileName}'";
+                dlg.Text = string.Format(LanguageManager.GetString("MainForm.SelectLangTitleFormat", "Select Language - '{0}'"), sDoc.FileName);
                 dlg.Size = new Size(420, 185);
                 dlg.StartPosition = FormStartPosition.CenterParent;
                 dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -6023,7 +6053,7 @@ namespace CsfStudio.UI
 
                 var lblPrompt = new Label
                 {
-                    Text = $"Select Language for '{sDoc.FileName}' ({oldTag}):",
+                    Text = string.Format(LanguageManager.GetString("MainForm.SelectLangPromptFormat", "Select Language for '{0}' ({1}):"), sDoc.FileName, oldTag),
                     Location = new Point(15, 15),
                     AutoSize = true,
                     Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold)
@@ -6037,19 +6067,7 @@ namespace CsfStudio.UI
                     Font = new Font(FontFamily.GenericSansSerif, 8.5f)
                 };
 
-                cboLang.Items.AddRange(new object[] {
-                    "English (US) [en]",
-                    "French [fr]",
-                    "German [de]",
-                    "Spanish [es]",
-                    "Italian [it]",
-                    "Russian [ru]",
-                    "Polish [pl]",
-                    "Japanese [ja]",
-                    "Korean [ko]",
-                    "Traditional Chinese [zh-Hant]",
-                    "Simplified Chinese [zh-Hans]"
-                });
+                cboLang.Items.AddRange(CsfStudio.Core.Translation.TranslationLanguageHelper.GetLanguageOptions().ToArray());
 
                 string matchedItem = cboLang.Items.Cast<object>()
                     .Select(o => o.ToString())
@@ -6064,7 +6082,7 @@ namespace CsfStudio.UI
 
                 var btnOk = new Button
                 {
-                    Text = "OK",
+                    Text = LanguageManager.GetString("Button.OK", "OK"),
                     DialogResult = DialogResult.OK,
                     Location = new Point(215, 95),
                     Width = 80,
@@ -6073,7 +6091,7 @@ namespace CsfStudio.UI
 
                 var btnCancel = new Button
                 {
-                    Text = "Cancel",
+                    Text = LanguageManager.GetString("Button.Cancel", "Cancel"),
                     DialogResult = DialogResult.Cancel,
                     Location = new Point(305, 95),
                     Width = 80,
@@ -6100,7 +6118,11 @@ namespace CsfStudio.UI
 
                     if (string.IsNullOrWhiteSpace(newTag))
                     {
-                        MessageBox.Show("Language tag cannot be blank.", "Invalid Language", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show(
+                            LanguageManager.GetString("Msg.LanguageTagBlank", "Language tag cannot be blank."),
+                            LanguageManager.GetString("Title.InvalidLanguage", "Invalid Language"),
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
                         return;
                     }
 
@@ -6111,22 +6133,37 @@ namespace CsfStudio.UI
 
                     if (_session.Documents.Any(d => d != sDoc && string.Equals(d.LanguageTag, newTag, StringComparison.OrdinalIgnoreCase)))
                     {
-                        MessageBox.Show($"A file with language tag '{newTag}' already exists in this session. All file language tags must be unique.",
-                            "Duplicate Language Tag", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        MessageBox.Show(
+                            string.Format(LanguageManager.GetString("Msg.DuplicateLanguageTagFormat", "A file with language tag '{0}' already exists in this session. All file language tags must be unique."), newTag),
+                            LanguageManager.GetString("Title.DuplicateLanguageTag", "Duplicate Language Tag"),
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
                         return;
                     }
 
                     sDoc.LanguageTag = newTag;
+                    string normalizedLang = TranslationLanguageHelper.Normalize(comboText);
+                    if (!string.IsNullOrEmpty(normalizedLang) && normalizedLang != "auto")
+                    {
+                        sDoc.TranslationContentLanguage = normalizedLang;
+                    }
                     if (sDoc.Document != null)
                     {
                         sDoc.Document.Language = MapTagToCsfLanguage(newTag);
                     }
                     sDoc.IsModified = true;
 
+                    OnSessionUpdated();
                     UpdateUIForSessionMode();
                     RebuildCategoryTreeAndGrid();
+                    RefreshActiveSelectionInspector();
+                    SaveSessionViewStateToConfig();
                     UpdateFormTitle();
-                    MessageBox.Show($"Updated file language tag to '{newTag}'.", "Language Updated", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(
+                        string.Format(LanguageManager.GetString("Msg.UpdatedFileLanguageTagFormat", "Updated file language tag to '{0}'."), newTag),
+                        LanguageManager.GetString("Title.LanguageUpdated", "Language Updated"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
                 }
             }
         }
@@ -6134,22 +6171,28 @@ namespace CsfStudio.UI
         private static CsfLanguage MapTagToCsfLanguage(string tag)
         {
             if (string.IsNullOrWhiteSpace(tag)) return CsfLanguage.EnglishUS;
-            string t = tag.ToLowerInvariant();
-            if (t.Contains("es") || t.Contains("spanish")) return CsfLanguage.Spanish;
-            if (t.Contains("fr") || t.Contains("french")) return CsfLanguage.French;
-            if (t.Contains("de") || t.Contains("german")) return CsfLanguage.German;
-            if (t.Contains("it") || t.Contains("italian")) return CsfLanguage.Italian;
-            if (t.Contains("ja") || t.Contains("jp") || t.Contains("japanese")) return CsfLanguage.Japanese;
-            if (t.Contains("ko") || t.Contains("korean")) return CsfLanguage.Korean;
-            if (t.Contains("zh") || t.Contains("chi") || t.Contains("chinese")) return CsfLanguage.Chinese;
-            return CsfLanguage.EnglishUS;
+            string iso = CsfStudio.Core.Translation.TranslationLanguageHelper.Normalize(tag).ToLowerInvariant();
+            switch (iso)
+            {
+                case "es": return CsfLanguage.Spanish;
+                case "fr": return CsfLanguage.French;
+                case "de": return CsfLanguage.German;
+                case "it": return CsfLanguage.Italian;
+                case "ja": return CsfLanguage.Japanese;
+                case "ko": return CsfLanguage.Korean;
+                case "zh":
+                case "zh-cn":
+                case "zh-hans":
+                case "zh-hant": return CsfLanguage.Chinese;
+                default: return CsfLanguage.EnglishUS;
+            }
         }
 
         private ToolStripMenuItem CreateCapitalizationSubMenu(TextBox txtEditor)
         {
-            var menuCap = new ToolStripMenuItem("🔤 Capitalization");
+            var menuCap = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.Capitalization", "🔤 Capitalization"));
 
-            var itemUpper = new ToolStripMenuItem("UPPERCASE");
+            var itemUpper = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.Uppercase", "UPPERCASE"));
             itemUpper.Click += (s, e) =>
             {
                 if (txtEditor != null && txtEditor.SelectionLength > 0)
@@ -6158,7 +6201,7 @@ namespace CsfStudio.UI
                 }
             };
 
-            var itemLower = new ToolStripMenuItem("lowercase");
+            var itemLower = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.Lowercase", "lowercase"));
             itemLower.Click += (s, e) =>
             {
                 if (txtEditor != null && txtEditor.SelectionLength > 0)
@@ -6167,7 +6210,7 @@ namespace CsfStudio.UI
                 }
             };
 
-            var itemTitle = new ToolStripMenuItem("Title Case");
+            var itemTitle = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.TitleCase", "Title Case"));
             itemTitle.Click += (s, e) =>
             {
                 if (txtEditor != null && txtEditor.SelectionLength > 0)
@@ -6177,7 +6220,7 @@ namespace CsfStudio.UI
                 }
             };
 
-            var itemSentence = new ToolStripMenuItem("Sentence case");
+            var itemSentence = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.SentenceCase", "Sentence case"));
             itemSentence.Click += (s, e) =>
             {
                 if (txtEditor != null && txtEditor.SelectionLength > 0)
@@ -6214,10 +6257,10 @@ namespace CsfStudio.UI
 
             if (txtEditor != null)
             {
-                var itemCut = new ToolStripMenuItem("✂️ Cut", null, (s, e) => txtEditor.Cut()) { ShortcutKeyDisplayString = "Ctrl+X" };
-                var itemCopy = new ToolStripMenuItem("📋 Copy", null, (s, e) => txtEditor.Copy()) { ShortcutKeyDisplayString = "Ctrl+C" };
-                var itemPaste = new ToolStripMenuItem("📋 Paste", null, (s, e) => txtEditor.Paste()) { ShortcutKeyDisplayString = "Ctrl+V" };
-                var itemSelectAll = new ToolStripMenuItem("🔠 Select All", null, (s, e) => txtEditor.SelectAll()) { ShortcutKeyDisplayString = "Ctrl+A" };
+                var itemCut = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.Cut", "✂️ Cut"), null, (s, e) => txtEditor.Cut()) { ShortcutKeyDisplayString = "Ctrl+X" };
+                var itemCopy = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.Copy", "📋 Copy"), null, (s, e) => txtEditor.Copy()) { ShortcutKeyDisplayString = "Ctrl+C" };
+                var itemPaste = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.Paste", "📋 Paste"), null, (s, e) => txtEditor.Paste()) { ShortcutKeyDisplayString = "Ctrl+V" };
+                var itemSelectAll = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.SelectAll", "🔠 Select All"), null, (s, e) => txtEditor.SelectAll()) { ShortcutKeyDisplayString = "Ctrl+A" };
                 var menuCap = CreateCapitalizationSubMenu(txtEditor);
 
                 menu.Opening += (s, e) =>
@@ -6239,15 +6282,15 @@ namespace CsfStudio.UI
                 menu.Items.Add(new ToolStripSeparator());
             }
 
-            var itemRenameLabel = new ToolStripMenuItem("🏷️ Rename / Edit File Label...");
+            var itemRenameLabel = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.RenameFileLabel", "🏷️ Rename / Edit File Label..."));
             itemRenameLabel.Click += (s, e) => PromptRenameFileLabel(sDoc);
             menu.Items.Add(itemRenameLabel);
 
-            var itemChangeLang = new ToolStripMenuItem("🌍 Set Translation Content Language...");
+            var itemChangeLang = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.SetContentLanguage", "🌍 Set Translation Content Language..."));
             itemChangeLang.Click += (s, e) => PromptTranslationContentLanguage(sDoc);
             menu.Items.Add(itemChangeLang);
 
-            var itemChangeLangId = new ToolStripMenuItem($"🌐 Change Header Language ID (Offset 0x14)...");
+            var itemChangeLangId = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.ChangeHeaderLangId", "🌐 Change Header Language ID (Offset 0x14)..."));
             itemChangeLangId.Click += (s, e) => PromptChangeHeaderLanguage(sDoc);
             menu.Items.Add(itemChangeLangId);
 
@@ -6266,19 +6309,19 @@ namespace CsfStudio.UI
                         srcText = txtSrcEditor.Text;
                     }
 
-                    var itemCopyText = new ToolStripMenuItem($"📋 Copy '{langTag}' Text to ALL other files")
+                    var itemCopyText = new ToolStripMenuItem(string.Format(LanguageManager.GetString("Menu.ContextMenu.CopyLangTextToAllFormat", "📋 Copy '{0}' Text to ALL other files"), langTag))
                     {
                         Enabled = exists && !string.IsNullOrEmpty(srcText)
                     };
                     itemCopyText.Click += (s, e) => CopyValueToAllOtherDocs(row.KeyName, langTag, srcText, null, copyText: true, copyAudio: false);
 
-                    var itemCopyAudio = new ToolStripMenuItem($"🎵 Copy '{langTag}' Audio WAV to ALL other files")
+                    var itemCopyAudio = new ToolStripMenuItem(string.Format(LanguageManager.GetString("Menu.ContextMenu.CopyLangAudioToAllFormat", "🎵 Copy '{0}' Audio WAV to ALL other files"), langTag))
                     {
                         Enabled = exists && !string.IsNullOrEmpty(srcAudio)
                     };
                     itemCopyAudio.Click += (s, e) => CopyValueToAllOtherDocs(row.KeyName, langTag, null, srcAudio, copyText: false, copyAudio: true);
 
-                    var itemCopyBoth = new ToolStripMenuItem($"🔄 Copy '{langTag}' BOTH Text & Audio to ALL other files")
+                    var itemCopyBoth = new ToolStripMenuItem(string.Format(LanguageManager.GetString("Menu.ContextMenu.CopyLangBothToAllFormat", "🔄 Copy '{0}' BOTH Text & Audio to ALL other files"), langTag))
                     {
                         Enabled = exists && (!string.IsNullOrEmpty(srcText) || !string.IsNullOrEmpty(srcAudio))
                     };
@@ -6290,14 +6333,14 @@ namespace CsfStudio.UI
                     menu.Items.Add(new ToolStripSeparator());
                 }
 
-                var itemMassSyncAudio = new ToolStripMenuItem($"⚡ Mass Sync ALL Audio WAVs from [{langTag}] to ALL other files");
+                var itemMassSyncAudio = new ToolStripMenuItem(string.Format(LanguageManager.GetString("Menu.ContextMenu.MassSyncAudioFormat", "⚡ Mass Sync ALL Audio WAVs from [{0}] to ALL other files"), langTag));
                 var targetDoc = sDoc;
                 itemMassSyncAudio.Click += (s, e) => MassSyncAudioFromDoc(targetDoc);
                 menu.Items.Add(itemMassSyncAudio);
                 menu.Items.Add(new ToolStripSeparator());
             }
 
-            var itemOpenExplorer = new ToolStripMenuItem("📂 Open File Location in Explorer")
+            var itemOpenExplorer = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.OpenFileLocation", "📂 Open File Location in Explorer"))
             {
                 Enabled = sDoc != null && !string.IsNullOrEmpty(sDoc.FilePath) && File.Exists(sDoc.FilePath)
             };
@@ -6311,7 +6354,11 @@ namespace CsfStudio.UI
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show($"Error opening explorer:\n{ex.Message}");
+                        MessageBox.Show(
+                            string.Format(LanguageManager.GetString("Msg.ErrorOpeningExplorerFormat", "Error opening explorer:\n{0}"), ex.Message),
+                            LanguageManager.GetString("Title.Error", "Error"),
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
                     }
                 }
             };
@@ -6327,7 +6374,7 @@ namespace CsfStudio.UI
                 bool isUnpinned = _unpinnedTargetLanguageTags.Contains(langTag);
                 if (!isUnpinned)
                 {
-                    var itemSplit = new ToolStripMenuItem($"📖 Move '{langTag}' to Split View (Unpin Column)");
+                    var itemSplit = new ToolStripMenuItem(string.Format(LanguageManager.GetString("Menu.ContextMenu.MoveToSplitViewFormat", "📖 Move '{0}' to Split View (Unpin Column)"), langTag));
                     itemSplit.Click += (s, e) =>
                     {
                         _unpinnedTargetLanguageTags.Add(langTag);
@@ -6347,7 +6394,7 @@ namespace CsfStudio.UI
                 }
                 else
                 {
-                    var itemDock = new ToolStripMenuItem($"📌 Dock '{langTag}' Back to Tab Group");
+                    var itemDock = new ToolStripMenuItem(string.Format(LanguageManager.GetString("Menu.ContextMenu.DockBackFormat", "📌 Dock '{0}' Back to Tab Group"), langTag));
                     itemDock.Click += (s, e) =>
                     {
                         _unpinnedTargetLanguageTags.Remove(langTag);
@@ -6358,7 +6405,7 @@ namespace CsfStudio.UI
 
                 if (_unpinnedTargetLanguageTags.Count > 0)
                 {
-                    var itemDockAll = new ToolStripMenuItem("📌 Dock All Back to Tab Group");
+                    var itemDockAll = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.DockAllBack", "📌 Dock All Back to Tab Group"));
                     itemDockAll.Click += (s, e) =>
                     {
                         _unpinnedTargetLanguageTags.Clear();
@@ -6391,10 +6438,10 @@ namespace CsfStudio.UI
 
             if (txtEditor != null)
             {
-                var itemCut = new ToolStripMenuItem("✂️ Cut", null, (s, e) => txtEditor.Cut()) { ShortcutKeyDisplayString = "Ctrl+X" };
-                var itemCopy = new ToolStripMenuItem("📋 Copy", null, (s, e) => txtEditor.Copy()) { ShortcutKeyDisplayString = "Ctrl+C" };
-                var itemPaste = new ToolStripMenuItem("📋 Paste", null, (s, e) => txtEditor.Paste()) { ShortcutKeyDisplayString = "Ctrl+V" };
-                var itemSelectAll = new ToolStripMenuItem("🔠 Select All", null, (s, e) => txtEditor.SelectAll()) { ShortcutKeyDisplayString = "Ctrl+A" };
+                var itemCut = new ToolStripMenuItem(LanguageManager.GetString("Menu.Edit.Cut", "✂️ Cut"), null, (s, e) => txtEditor.Cut()) { ShortcutKeyDisplayString = "Ctrl+X" };
+                var itemCopy = new ToolStripMenuItem(LanguageManager.GetString("Menu.Edit.Copy", "📋 Copy"), null, (s, e) => txtEditor.Copy()) { ShortcutKeyDisplayString = "Ctrl+C" };
+                var itemPaste = new ToolStripMenuItem(LanguageManager.GetString("Menu.Edit.Paste", "📋 Paste"), null, (s, e) => txtEditor.Paste()) { ShortcutKeyDisplayString = "Ctrl+V" };
+                var itemSelectAll = new ToolStripMenuItem(LanguageManager.GetString("Menu.Edit.SelectAll", "🔠 Select All"), null, (s, e) => txtEditor.SelectAll()) { ShortcutKeyDisplayString = "Ctrl+A" };
                 var menuCap = CreateCapitalizationSubMenu(txtEditor);
 
                 menu.Opening += (s, e) =>
@@ -6418,15 +6465,15 @@ namespace CsfStudio.UI
 
             if (baseDoc != null)
             {
-                var itemRenameLabel = new ToolStripMenuItem("🏷️ Rename / Edit File Label...");
+                var itemRenameLabel = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.RenameFileLabel", "🏷️ Rename / Edit File Label..."));
                 itemRenameLabel.Click += (s, e) => PromptRenameFileLabel(baseDoc);
                 menu.Items.Add(itemRenameLabel);
 
-                var itemChangeLang = new ToolStripMenuItem("🌍 Set Translation Content Language...");
+                var itemChangeLang = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.SetContentLanguage", "🌍 Set Translation Content Language..."));
                 itemChangeLang.Click += (s, e) => PromptTranslationContentLanguage(baseDoc);
                 menu.Items.Add(itemChangeLang);
 
-                var itemChangeLangId = new ToolStripMenuItem($"🌐 Change Header Language ID (Offset 0x14)...");
+                var itemChangeLangId = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.ChangeHeaderLangId", "🌐 Change Header Language ID (Offset 0x14)..."));
                 itemChangeLangId.Click += (s, e) => PromptChangeHeaderLanguage(baseDoc);
                 menu.Items.Add(itemChangeLangId);
 
@@ -6446,13 +6493,13 @@ namespace CsfStudio.UI
                         baseText = txtBaseEditor.Text;
                     }
 
-                    var itemCopyText = new ToolStripMenuItem("📋 Copy text from Main CSF file to ALL target files");
+                    var itemCopyText = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.CopyTextFromMainToAll", "📋 Copy text from Main CSF file to ALL target files"));
                     itemCopyText.Click += (s, e) => CopyValueToAllOtherDocs(row.KeyName, baseLangTag, baseText, null, copyText: true, copyAudio: false);
 
-                    var itemCopyAudio = new ToolStripMenuItem("🎵 Copy audio WAV from Main CSF file to ALL target files");
+                    var itemCopyAudio = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.CopyAudioFromMainToAll", "🎵 Copy audio WAV from Main CSF file to ALL target files"));
                     itemCopyAudio.Click += (s, e) => CopyValueToAllOtherDocs(row.KeyName, baseLangTag, null, baseAudio, copyText: false, copyAudio: true);
 
-                    var itemCopyBoth = new ToolStripMenuItem("🔄 Copy BOTH text & audio from Main CSF file to ALL target files");
+                    var itemCopyBoth = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.CopyBothFromMainToAll", "🔄 Copy BOTH text & audio from Main CSF file to ALL target files"));
                     itemCopyBoth.Click += (s, e) => CopyValueToAllOtherDocs(row.KeyName, baseLangTag, baseText, baseAudio, copyText: true, copyAudio: true);
 
                     menu.Items.Add(itemCopyText);
@@ -6461,13 +6508,13 @@ namespace CsfStudio.UI
                     menu.Items.Add(new ToolStripSeparator());
                 }
 
-                var itemMassSyncAudio = new ToolStripMenuItem($"⚡ Mass sync ALL audio WAVs from Main CSF file [{baseDoc.LanguageTag}] to ALL target files");
+                var itemMassSyncAudio = new ToolStripMenuItem(string.Format(LanguageManager.GetString("Menu.ContextMenu.MassSyncAudioFromMainFormat", "⚡ Mass sync ALL audio WAVs from Main CSF file [{0}] to ALL target files"), baseDoc.LanguageTag));
                 itemMassSyncAudio.Click += (s, e) => MassSyncAudioFromDoc(baseDoc);
                 menu.Items.Add(itemMassSyncAudio);
                 menu.Items.Add(new ToolStripSeparator());
             }
 
-            var itemOpenExplorer = new ToolStripMenuItem("📂 Open File Location in Explorer")
+            var itemOpenExplorer = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.OpenFileLocation", "📂 Open File Location in Explorer"))
             {
                 Enabled = baseDoc != null && !string.IsNullOrEmpty(baseDoc.FilePath) && File.Exists(baseDoc.FilePath)
             };
@@ -6481,7 +6528,11 @@ namespace CsfStudio.UI
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show($"Error opening explorer:\n{ex.Message}");
+                        MessageBox.Show(
+                            string.Format(LanguageManager.GetString("Msg.ErrorOpeningExplorerFormat", "Error opening explorer:\n{0}"), ex.Message),
+                            LanguageManager.GetString("Title.Error", "Error"),
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
                     }
                 }
             };
@@ -6496,7 +6547,7 @@ namespace CsfStudio.UI
 
             using (var dlg = new Form())
             {
-                dlg.Text = $"Change Binary Language ID - {sDoc.LanguageTag}";
+                dlg.Text = string.Format(LanguageManager.GetString("MainForm.ChangeBinaryLangIdTitleFormat", "Change Binary Language ID - {0}"), sDoc.LanguageTag);
                 dlg.Size = new Size(510, 260);
                 dlg.StartPosition = FormStartPosition.CenterParent;
                 dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -6506,8 +6557,7 @@ namespace CsfStudio.UI
 
                 var lblInfo = new Label
                 {
-                    Text = "Sets the 32-bit Language ID stored at byte offset 0x14 in the CSF binary header.\n\n" +
-                           "⚠️ Ares Engine Expansion: Setting 'LanguageNeutral' (-1 / 0xFFFFFFFF) ONLY works when using the Ares Engine Expansion DLL. Vanilla C&C YR / RA2 does NOT support language-neutral CSF tables.",
+                    Text = LanguageManager.GetString("MainForm.ChangeHeaderLangInfo", "Sets the 32-bit Language ID stored at byte offset 0x14 in the CSF binary header.\n\n⚠️ Ares Engine Expansion: Setting 'LanguageNeutral' (-1 / 0xFFFFFFFF) ONLY works when using the Ares Engine Expansion DLL. Vanilla C&C YR / RA2 does NOT support language-neutral CSF tables."),
                     Location = new Point(15, 12),
                     Size = new Size(465, 75),
                     Font = new Font(FontFamily.GenericSansSerif, 8.5f)
@@ -6515,7 +6565,7 @@ namespace CsfStudio.UI
 
                 var lblComboPrompt = new Label
                 {
-                    Text = "Header Language ID:",
+                    Text = LanguageManager.GetString("MainForm.HeaderLangIdPrompt", "Header Language ID:"),
                     Location = new Point(15, 102),
                     AutoSize = true,
                     Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold)
@@ -6532,7 +6582,7 @@ namespace CsfStudio.UI
                 foreach (CsfLanguage lang in allLangs)
                 {
                     string extraInfo = lang == CsfLanguage.LanguageNeutral
-                        ? "LanguageNeutral (-1 / 0xFFFFFFFF) [Requires Ares DLL]"
+                        ? LanguageManager.GetString("MainForm.LangNeutralDescription", "LanguageNeutral (-1 / 0xFFFFFFFF) [Requires Ares DLL]")
                         : $"{lang} ({(int)lang})";
                     cmbLang.Items.Add(extraInfo);
 
@@ -6549,7 +6599,7 @@ namespace CsfStudio.UI
 
                 var btnOk = new Button
                 {
-                    Text = "OK",
+                    Text = LanguageManager.GetString("Button.OK", "OK"),
                     DialogResult = DialogResult.None,
                     Location = new Point(285, 145),
                     Size = new Size(85, 28)
@@ -6557,7 +6607,7 @@ namespace CsfStudio.UI
 
                 var btnCancel = new Button
                 {
-                    Text = "Cancel",
+                    Text = LanguageManager.GetString("Button.Cancel", "Cancel"),
                     DialogResult = DialogResult.Cancel,
                     Location = new Point(385, 145),
                     Size = new Size(85, 28)
@@ -6565,7 +6615,7 @@ namespace CsfStudio.UI
 
                 var lblContentLanguage = new Label
                 {
-                    Text = "Translation Content Language:",
+                    Text = LanguageManager.GetString("MainForm.TranslationContentLanguagePrompt", "Translation Content Language:"),
                     Location = new Point(15, 140),
                     AutoSize = true,
                     Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold),
@@ -6631,7 +6681,11 @@ namespace CsfStudio.UI
                         string contentLanguage = TranslationLanguageHelper.Normalize(cboContentLanguage.Text);
                         if (string.IsNullOrEmpty(contentLanguage) || contentLanguage == "auto")
                         {
-                            MessageBox.Show("Select the language used by the text content of this neutral CSF.", "Language Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            MessageBox.Show(
+                                LanguageManager.GetString("Msg.NeutralLangRequired", "Select the language used by the text content of this neutral CSF."),
+                                LanguageManager.GetString("Title.NeutralLangRequired", "Language Required"),
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning);
                             return;
                         }
                     }
@@ -6691,9 +6745,13 @@ namespace CsfStudio.UI
                             RebuildCategoryTreeAndGrid();
                             SaveSessionViewStateToConfig();
                             string message = headerChanged
-                                ? $"Updated binary Language ID for [{sDoc.LanguageTag}] to {newLang} ({(int)newLang})."
-                                : $"Updated translation content language for [{sDoc.LanguageTag}] to {sDoc.TranslationContentLanguage}.";
-                            MessageBox.Show(message, "Language Settings Updated", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                ? string.Format(LanguageManager.GetString("Msg.HeaderLangUpdatedFormat", "Updated binary Language ID for [{0}] to {1} ({2})."), sDoc.LanguageTag, newLang, (int)newLang)
+                                : string.Format(LanguageManager.GetString("Msg.TranslationContentLangUpdatedFormat", "Updated translation content language for [{0}] to {1}."), sDoc.LanguageTag, sDoc.TranslationContentLanguage);
+                            MessageBox.Show(
+                                message,
+                                LanguageManager.GetString("Title.LanguageSettingsUpdated", "Language Settings Updated"),
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information);
                         }
                     }
                 }
@@ -6726,7 +6784,8 @@ namespace CsfStudio.UI
 
         private static string CheckLinterStatusString(string baseText, string currentText)
         {
-            if (string.IsNullOrEmpty(baseText) || string.IsNullOrEmpty(currentText)) return "OK";
+            if (string.IsNullOrEmpty(baseText) || string.IsNullOrEmpty(currentText))
+                return LanguageManager.GetString("Linter.Status.OK", "OK");
 
             int baseS = CountFormatSpecifiers(baseText);
             int currS = CountFormatSpecifiers(currentText);
@@ -6735,10 +6794,14 @@ namespace CsfStudio.UI
             int currN = CountLineBreaks(currentText);
 
             var issues = new List<string>();
-            if (baseS != currS) issues.Add($"Format specifiers mismatch (Base: {baseS}, Current: {currS})");
-            if (baseN != currN) issues.Add($"Line breaks mismatch (Base: {baseN}, Current: {currN})");
+            if (baseS != currS)
+                issues.Add(LanguageManager.GetStringFormat("Linter.Issue.FormatSpecifiersMismatch", "Format specifiers mismatch (Base: {0}, Current: {1})", baseS, currS));
+            if (baseN != currN)
+                issues.Add(LanguageManager.GetStringFormat("Linter.Issue.LineBreaksMismatch", "Line breaks mismatch (Base: {0}, Current: {1})", baseN, currN));
 
-            return issues.Count == 0 ? "OK (All modifiers match base)" : $"⚠️ {string.Join(" | ", issues)}";
+            return issues.Count == 0
+                ? LanguageManager.GetString("Linter.Status.OKAllMatch", "OK (All modifiers match base)")
+                : $"⚠️ {string.Join(" | ", issues)}";
         }
 
         private void CheckLinterModifiers(string baseText, string currentText, Label lblLinter)
@@ -6758,7 +6821,7 @@ namespace CsfStudio.UI
 
             if (baseFormatCount != currFormatCount || baseLineBreaks != currLineBreaks)
             {
-                lblLinter.Text = "⚠️ Linter Alert: Format specifiers or line breaks mismatch with base language";
+                lblLinter.Text = LanguageManager.GetString("MainForm.LinterAlert", "⚠️ Linter Alert: Format specifiers or line breaks mismatch with base language");
                 lblLinter.ForeColor = Color.DarkOrange;
                 lblLinter.Visible = true;
             }
@@ -6795,28 +6858,32 @@ namespace CsfStudio.UI
             if (btnKeyFilterMode != null)
             {
                 btnKeyFilterMode.Checked = _keyRegexMode;
-                btnKeyFilterMode.Text = _keyRegexMode ? "🔍 Key Filter (RegEx):" : "🔍 Key Filter:";
+                btnKeyFilterMode.Text = _keyRegexMode
+                    ? LanguageManager.GetString("Toolbar.KeyFilterModeRegex", "🔍 Key Filter (RegEx):")
+                    : LanguageManager.GetString("Toolbar.KeyFilterMode", "🔍 Key Filter:");
                 ToolTipHelper.SetToolTip(btnKeyFilterMode, _keyRegexMode
-                    ? "Key Filter Mode: Regular Expression (RegEx) active. Click to switch to Plain Text search."
-                    : "Key Filter Mode: Plain Text search active. Click to switch to Regular Expression (RegEx) mode.");
+                    ? LanguageManager.GetString("ToolTip.KeyFilterModeRegex", "Key Filter Mode: Regular Expression (RegEx) active. Click to switch to Plain Text search.")
+                    : LanguageManager.GetString("ToolTip.KeyFilterModePlain", "Key Filter Mode: Plain Text search active. Click to switch to Regular Expression (RegEx) mode."));
             }
 
             if (btnValFilterMode != null)
             {
                 btnValFilterMode.Checked = _valRegexMode;
-                btnValFilterMode.Text = _valRegexMode ? "🔍 Text Filter (RegEx):" : "🔍 Text Filter:";
+                btnValFilterMode.Text = _valRegexMode
+                    ? LanguageManager.GetString("Toolbar.ValFilterModeRegex", "🔍 Text Filter (RegEx):")
+                    : LanguageManager.GetString("Toolbar.ValFilterMode", "🔍 Text Filter:");
                 ToolTipHelper.SetToolTip(btnValFilterMode, _valRegexMode
-                    ? "Text Filter Mode: Regular Expression (RegEx) active. Click to switch to Plain Text search."
-                    : "Text Filter Mode: Plain Text search active. Click to switch to Regular Expression (RegEx) mode.");
+                    ? LanguageManager.GetString("ToolTip.ValFilterModeRegex", "Text Filter Mode: Regular Expression (RegEx) active. Click to switch to Plain Text search.")
+                    : LanguageManager.GetString("ToolTip.ValFilterModePlain", "Text Filter Mode: Plain Text search active. Click to switch to Regular Expression (RegEx) mode."));
             }
 
             string keyBoxTip = _keyRegexMode
-                ? "Filter Key Names (RegEx Mode): Type a Regular Expression pattern (e.g. ^GUI:.*). Case-insensitive."
-                : "Filter Key Names (Plain Text Mode): Type plain text to filter (Case-insensitive). Click 'Key Filter' button to switch to RegEx mode.";
+                ? LanguageManager.GetString("ToolTip.SearchKeyBoxRegex", "Filter Key Names (RegEx Mode): Type a Regular Expression pattern (e.g. ^GUI:.*). Case-insensitive.")
+                : LanguageManager.GetString("ToolTip.SearchKeyBoxPlain", "Filter Key Names (Plain Text Mode): Type plain text to filter (Case-insensitive). Click 'Key Filter' button to switch to RegEx mode.");
 
             string valBoxTip = _valRegexMode
-                ? "Filter String Values (RegEx Mode): Type a Regular Expression pattern (e.g. \\bunit\\b). Case-insensitive."
-                : "Filter String Values (Plain Text Mode): Type plain text to filter (Case-insensitive). Click 'Text Filter' button to switch to RegEx mode.";
+                ? LanguageManager.GetString("ToolTip.SearchValBoxRegex", "Filter String Values (RegEx Mode): Type a Regular Expression pattern (e.g. \\bunit\\b). Case-insensitive.")
+                : LanguageManager.GetString("ToolTip.SearchValBoxPlain", "Filter String Values (Plain Text Mode): Type plain text to filter (Case-insensitive). Click 'Text Filter' button to switch to RegEx mode.");
 
             if (cboSearchKey != null)
             {
@@ -6835,12 +6902,16 @@ namespace CsfStudio.UI
         {
             if (btnFilterLogic == null) return;
 
-            string keyModeStr = _keyRegexMode ? "RegEx" : "Plain Text";
-            string valModeStr = _valRegexMode ? "RegEx" : "Plain Text";
+            string keyModeStr = _keyRegexMode
+                ? LanguageManager.GetString("Mode.Regex", "RegEx")
+                : LanguageManager.GetString("Mode.PlainText", "Plain Text");
+            string valModeStr = _valRegexMode
+                ? LanguageManager.GetString("Mode.Regex", "RegEx")
+                : LanguageManager.GetString("Mode.PlainText", "Plain Text");
 
             string tooltipText = _filterLogicAnd
-                ? $"Filter Combination: AND Mode\n• Matches keys where Key ({keyModeStr}) AND Text ({valModeStr}) conditions are BOTH met."
-                : $"Filter Combination: OR Mode\n• Matches keys where EITHER Key ({keyModeStr}) OR Text ({valModeStr}) condition is met.";
+                ? string.Format(LanguageManager.GetString("ToolTip.FilterLogicAndFormat", "Filter Combination: AND Mode\n• Matches keys where Key ({0}) AND Text ({1}) conditions are BOTH met."), keyModeStr, valModeStr)
+                : string.Format(LanguageManager.GetString("ToolTip.FilterLogicOrFormat", "Filter Combination: OR Mode\n• Matches keys where EITHER Key ({0}) OR Text ({1}) condition is met."), keyModeStr, valModeStr);
 
             ToolTipHelper.SetToolTip(btnFilterLogic, tooltipText);
         }
@@ -6850,18 +6921,27 @@ namespace CsfStudio.UI
             var selectedKeys = GetCurrentlySelectedKeyNames();
             if (selectedKeys == null || selectedKeys.Count == 0)
             {
-                MessageBox.Show("Please select at least one key in the grid to duplicate.", "Duplicate Keys", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.SelectKeyToDuplicate", "Please select at least one key in the grid to duplicate."),
+                    LanguageManager.GetString("Msg.DuplicateTitle", "Duplicate Keys"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
                 return;
             }
 
+            string suffixPrompt = string.Format(
+                LanguageManager.GetString("Msg.DuplicateSuffixPrompt", "Enter a suffix to append to the duplicated key(s):\n(Duplicating {0} key(s))"),
+                selectedKeys.Count);
+            string suffixTitle = LanguageManager.GetString("Msg.DuplicateTitle", "Duplicate Keys");
+
             string suffix = Microsoft.VisualBasic.Interaction.InputBox(
-                $"Enter a suffix to append to the duplicated key(s):\n(Duplicating {selectedKeys.Count} key(s))",
-                "Duplicate Keys",
+                suffixPrompt,
+                suffixTitle,
                 "_Copy");
 
             if (string.IsNullOrWhiteSpace(suffix)) return;
 
-            var batchCmd = new BatchUndoCommand("Duplicate Keys");
+            var batchCmd = new BatchUndoCommand(LanguageManager.GetString("Msg.DuplicateUndoCmd", "Duplicate Keys"));
             int count = 0;
             string firstNewKey = null;
 
@@ -6900,7 +6980,9 @@ namespace CsfStudio.UI
             RebuildCategoryTreeAndGrid();
             if (firstNewKey != null) EnsureKeyVisibleAndSelected(firstNewKey);
 
-            ShowSaveNotification($"Duplicated {count} key(s) successfully.");
+            ShowSaveNotification(string.Format(
+                LanguageManager.GetString("Toast.DuplicateSuccess", "Duplicated {0} key(s) successfully."),
+                count));
         }
 
         private static string ToSentenceCase(string input)
@@ -6940,17 +7022,19 @@ namespace CsfStudio.UI
 
             if (selectedKeys.Count == 0) return;
 
-            string targetScopeText = isAll ? $"ALL {selectedKeys.Count:N0} key names in the active session" : $"{selectedKeys.Count:N0} selected key name(s)";
+            string targetScopeText = isAll ? string.Format(LanguageManager.GetString("Capitalize.ScopeAllFormat", "ALL {0:N0} key names in the active session"), selectedKeys.Count) : string.Format(LanguageManager.GetString("Capitalize.ScopeSelectedFormat", "{0:N0} selected key name(s)"), selectedKeys.Count);
 
             var confirmResult = MessageBox.Show(
-                $"Are you sure you want to apply '{mode}' capitalization to {targetScopeText}?\n\nThis will rename key identifiers across open CSF documents. You can undo this action with Ctrl+Z.",
-                "Confirm Key Capitalization",
+                string.Format(LanguageManager.GetString("Msg.ConfirmCapitalizationFormat", "Are you sure you want to apply '{0}' capitalization to {1}?\n\nThis will rename key identifiers across open CSF documents. You can undo this action with Ctrl+Z."), mode, targetScopeText),
+                LanguageManager.GetString("Title.ConfirmKeyCapitalization", "Confirm Key Capitalization"),
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question);
 
             if (confirmResult != DialogResult.Yes) return;
 
-            var batchCmd = new BatchUndoCommand($"Capitalize Key Names ({mode})");
+            var batchCmd = new BatchUndoCommand(string.Format(
+                LanguageManager.GetString("Undo.CapitalizeKeys", "Capitalize Key Names ({0})"),
+                mode));
             int count = 0;
 
             foreach (var oldKey in selectedKeys)
@@ -6982,7 +7066,7 @@ namespace CsfStudio.UI
             {
                 _undoManager.Execute(batchCmd, _session);
                 RebuildCategoryTreeAndGrid();
-                ShowSaveNotification($"Capitalized {count} key name(s) to {mode}.");
+                ShowSaveNotification(string.Format(LanguageManager.GetString("Toast.CapitalizedKeysFormat", "Capitalized {0} key name(s) to {1}."), count, mode));
             }
         }
 
@@ -6996,7 +7080,10 @@ namespace CsfStudio.UI
             }
             else
             {
-                _reorderedKeyDetails[keyName] = $"Position changed (#{oldPos} ➔ #{newPos})";
+                _reorderedKeyDetails[keyName] = string.Format(
+                    LanguageManager.GetString("Grid.Status.PositionChanged", "Position changed (#{0} ➔ #{1})"),
+                    oldPos,
+                    newPos);
                 if (!_addedKeyNames.Contains(keyName) && !_deletedKeyNames.Contains(keyName))
                 {
                     _modifiedKeyNames.Add(keyName);
@@ -7124,18 +7211,18 @@ namespace CsfStudio.UI
                     grid.FirstDisplayedScrollingRowIndex = Math.Max(0, curr - 5);
                     OnGridSelectionChanged(grid);
 
-                    ShowSaveNotification($"🔍 Jumped to empty/untranslated key: '{keyName}' (Row {curr + 1})");
+                    ShowSaveNotification(string.Format(LanguageManager.GetString("Toast.JumpedToEmptyKeyFormat", "🔍 Jumped to empty/untranslated key: '{0}' (Row {1})"), keyName, curr + 1));
                     return;
                 }
             }
 
-            ShowSaveNotification("ℹ️ No untranslated or missing keys found in document.");
+            ShowSaveNotification(LanguageManager.GetString("Toast.NoUntranslatedKeysFound", "ℹ️ No untranslated or missing keys found in document."));
         }
 
         private void btnFilterLogic_Click(object sender, EventArgs e)
         {
             _filterLogicAnd = !_filterLogicAnd;
-            btnFilterLogic.Text = _filterLogicAnd ? "AND" : "OR";
+            btnFilterLogic.Text = _filterLogicAnd ? LanguageManager.GetString("Filter.Logic.And", "AND") : LanguageManager.GetString("Filter.Logic.Or", "OR");
             UpdateFilterLogicToolTip();
             PopulateMasterGrid();
         }
@@ -7164,7 +7251,7 @@ namespace CsfStudio.UI
             {
                 string val = r.Cells[c].Value?.ToString();
                 if (string.IsNullOrWhiteSpace(val)) continue;
-                if (val == "🟢" || val == "🟡" || val == "🔴" || val == "[Missing Entry]" || val == "[MISSING]") continue;
+                if (val == "🟢" || val == "🟡" || val == "🔴" || val == "[Missing Entry]" || val == "[MISSING]" || val == LanguageManager.GetString("Grid.Status.MissingEntry", "[Missing Entry]")) continue;
                 if (int.TryParse(val, out _)) continue;
                 return val;
             }
@@ -7218,19 +7305,23 @@ namespace CsfStudio.UI
 
             using (var dlg = new SaveFileDialog())
             {
-                dlg.Filter = "Plain Text UTF-8 (*.txt)|*.txt";
+                dlg.Filter = LanguageManager.GetString("Filter.TxtUtf8Only", "Plain Text UTF-8 (*.txt)|*.txt");
                 dlg.Title = selectedKeys != null && selectedKeys.Count > 0
-                    ? $"Export {selectedKeys.Count} Selected Keys from [{sDoc.LanguageTag}] to Plain Text UTF-8"
-                    : $"Export All Keys from [{sDoc.LanguageTag}] to Plain Text UTF-8";
+                    ? string.Format(LanguageManager.GetString("MainForm.ExportSelectedTitleFormat", "Export {0} Selected Keys from [{1}] to Plain Text UTF-8"), selectedKeys.Count, sDoc.LanguageTag)
+                    : string.Format(LanguageManager.GetString("MainForm.ExportAllTitleFormat", "Export All Keys from [{1}] to Plain Text UTF-8"), sDoc.LanguageTag);
                 dlg.FileName = Path.GetFileNameWithoutExtension(sDoc.FileName) + ".txt";
 
                 if (dlg.ShowDialog() == DialogResult.OK)
                 {
                     CsfTxtExporterImporter.ExportToTxt(sDoc.Document, dlg.FileName, selectedKeys);
                     string msg = selectedKeys != null && selectedKeys.Count > 0
-                        ? $"Successfully exported {selectedKeys.Count} selected keys from [{sDoc.LanguageTag}] to plain text."
-                        : $"Successfully exported all {sDoc.Document.Labels.Count} keys from [{sDoc.LanguageTag}] to plain text.";
-                    MessageBox.Show(msg, "Export Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ? string.Format(LanguageManager.GetString("Msg.ExportSelectedSuccessFormat", "Successfully exported {0} selected keys from [{1}] to plain text."), selectedKeys.Count, sDoc.LanguageTag)
+                        : string.Format(LanguageManager.GetString("Msg.ExportAllSuccessFormat", "Successfully exported all {0} keys from [{1}] to plain text."), sDoc.Document.Labels.Count, sDoc.LanguageTag);
+                    MessageBox.Show(
+                        msg,
+                        LanguageManager.GetString("Title.ExportSuccess", "Export Success"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
                 }
             }
         }
@@ -7241,8 +7332,8 @@ namespace CsfStudio.UI
 
             using (var dlg = new OpenFileDialog())
             {
-                dlg.Filter = "Plain Text UTF-8 (*.txt)|*.txt";
-                dlg.Title = $"Import Plain Text UTF-8 into [{sDoc.LanguageTag}]";
+                dlg.Filter = LanguageManager.GetString("Filter.TxtUtf8Only", "Plain Text UTF-8 (*.txt)|*.txt");
+                dlg.Title = string.Format(LanguageManager.GetString("MainForm.ImportTxtTitleFormat", "Import Plain Text UTF-8 into [{0}]"), sDoc.LanguageTag);
                 InitFileDialogDirectory(dlg);
                 if (dlg.ShowDialog() == DialogResult.OK)
                 {
@@ -7263,10 +7354,10 @@ namespace CsfStudio.UI
 
             using (var dlg = new SaveFileDialog())
             {
-                dlg.Filter = "Plain Text UTF-8 (*.txt)|*.txt";
+                dlg.Filter = LanguageManager.GetString("Filter.TxtUtf8Only", "Plain Text UTF-8 (*.txt)|*.txt");
                 dlg.Title = selectedKeys != null && selectedKeys.Count > 0
-                    ? $"Export {selectedKeys.Count} Selected Key Names Only from [{sDoc.LanguageTag}] to Plain Text UTF-8"
-                    : $"Export All Key Names Only from [{sDoc.LanguageTag}] to Plain Text UTF-8";
+                    ? string.Format(LanguageManager.GetString("MainForm.ExportSelectedKeysTitleFormat", "Export {0} Selected Key Names Only from [{1}] to Plain Text UTF-8"), selectedKeys.Count, sDoc.LanguageTag)
+                    : string.Format(LanguageManager.GetString("MainForm.ExportAllKeysTitleFormat", "Export All Key Names Only from [{0}] to Plain Text UTF-8"), sDoc.LanguageTag);
                 dlg.FileName = Path.GetFileNameWithoutExtension(sDoc.FileName) + "_KeysOnly.txt";
                 InitFileDialogDirectory(dlg);
 
@@ -7275,9 +7366,13 @@ namespace CsfStudio.UI
                     SaveLastOpenDirectory(dlg.FileName);
                     CsfTxtExporterImporter.ExportKeyStructureToTxt(keysToExport, dlg.FileName);
                     string msg = selectedKeys != null && selectedKeys.Count > 0
-                        ? $"Successfully exported {selectedKeys.Count} selected key names to plain text."
-                        : $"Successfully exported all {keysToExport.Count} key names to plain text.";
-                    MessageBox.Show(msg, "Export Key Structure Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        ? string.Format(LanguageManager.GetString("Msg.ExportSelectedKeysSuccessFormat", "Successfully exported {0} selected key names to plain text."), selectedKeys.Count)
+                        : string.Format(LanguageManager.GetString("Msg.ExportAllKeysSuccessFormat", "Successfully exported all {0} key names to plain text."), keysToExport.Count);
+                    MessageBox.Show(
+                        msg,
+                        LanguageManager.GetString("Title.ExportKeyStructureSuccess", "Export Key Structure Success"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
                 }
             }
         }
@@ -7307,15 +7402,19 @@ namespace CsfStudio.UI
         {
             int added = _session.SynchronizeAllMissingKeys(true);
             RebuildCategoryTreeAndGrid();
-            MessageBox.Show($"Synchronization completed. Created {added} missing keys across open files.", "Synchronization Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(
+                string.Format(LanguageManager.GetString("Msg.SyncCompletedFormat", "Synchronization completed. Created {0} missing keys across open files."), added),
+                LanguageManager.GetString("Title.SynchronizationSuccess", "Synchronization Success"),
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
 
         private void menuScanIni_Click(object sender, EventArgs e)
         {
             using (var dlg = new OpenFileDialog())
             {
-                dlg.Filter = "C&C INI & Map Files (*.ini;*.map)|*.ini;*.map|C&C INI Files (*.ini)|*.ini|C&C Map Files (*.map)|*.map|All Files (*.*)|*.*";
-                dlg.Title = "Select Mod INI or Map Files (rulesmd.ini, artmd.ini, mission.map, etc.)";
+                dlg.Filter = LanguageManager.GetString("Filter.IniMapFilter", "C&C INI & Map Files (*.ini;*.map)|*.ini;*.map|C&C INI Files (*.ini)|*.ini|C&C Map Files (*.map)|*.map|All Files (*.*)|*.*");
+                dlg.Title = LanguageManager.GetString("MainForm.ScanIniTitle", "Select Mod INI or Map Files (rulesmd.ini, artmd.ini, mission.map, etc.)");
                 dlg.Multiselect = true;
                 InitFileDialogDirectory(dlg);
 
@@ -7338,7 +7437,7 @@ namespace CsfStudio.UI
                             RebuildCategoryTreeAndGrid();
                             PopulateMasterGrid();
                             UpdateFormTitle();
-                            ShowSaveNotification("⚡ Added missing keys from INI scan to session");
+                            ShowSaveNotification(LanguageManager.GetString("Toast.AddedMissingKeysFromIniScan", "⚡ Added missing keys from INI scan to session"));
                         }
                     }
                 }
@@ -7351,8 +7450,11 @@ namespace CsfStudio.UI
         {
             if (_session == null || _session.Documents.Count == 0)
             {
-                MessageBox.Show("No open CSF files available for conversion. Please load or create a CSF file first.",
-                    "No Files Loaded", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.NoOpenCsfForConversion", "No open CSF files available for conversion. Please load or create a CSF file first."),
+                    LanguageManager.GetString("Title.NoFilesLoaded", "No Files Loaded"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
                 return;
             }
 
@@ -7366,7 +7468,7 @@ namespace CsfStudio.UI
                     if (selectedDocs == null || selectedDocs.Count == 0) return;
 
                     // 1. Create a safety session snapshot BEFORE conversion!
-                    BackupManager.CreateSessionSnapshot(_session, $"Convert ANSI ({encoding.EncodingName})");
+                    BackupManager.CreateSessionSnapshot(_session, string.Format(LanguageManager.GetString("Backup.Cause.ConvertAnsiFormat", "Convert ANSI ({0})"), encoding.EncodingName));
 
                     int totalConverted = 0;
                     foreach (var sDoc in selectedDocs)
@@ -7402,9 +7504,8 @@ namespace CsfStudio.UI
                     PopulateBackupsTab();
 
                     MessageBox.Show(
-                        $"Successfully converted {totalConverted} string entries across {selectedDocs.Count} file(s) using codepage '{encoding.EncodingName}'.\n\n" +
-                        "The open files have been marked as modified (*). An automatic backup snapshot was saved to the Backups tab.",
-                        "ANSI Conversion Complete",
+                        string.Format(LanguageManager.GetString("Msg.AnsiConversionCompleteFormat", "Successfully converted {0} string entries across {1} file(s) using codepage '{2}'.\n\nThe open files have been marked as modified (*). An automatic backup snapshot was saved to the Backups tab."), totalConverted, selectedDocs.Count, encoding.EncodingName),
+                        LanguageManager.GetString("Title.AnsiConversionComplete", "ANSI Conversion Complete"),
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information);
                 }
@@ -7425,7 +7526,7 @@ namespace CsfStudio.UI
 
             _lblBackupEmptyState = new Label
             {
-                Text = "🛡️ No backup snapshots exist for this session yet.\n\nBackup snapshots are created automatically whenever you save changes to your CSF files.\nOld backups older than 30 days are automatically cleaned up.",
+                Text = LanguageManager.GetString("MainForm.BackupEmptyState", "🛡️ No backup snapshots exist for this session yet.\n\nBackup snapshots are created automatically whenever you save changes to your CSF files.\nOld backups older than 30 days are automatically cleaned up."),
                 TextAlign = ContentAlignment.MiddleCenter,
                 Dock = DockStyle.Fill,
                 Font = new Font(FontFamily.GenericSansSerif, 11f, FontStyle.Regular),
@@ -7445,7 +7546,7 @@ namespace CsfStudio.UI
             var pnlLeft = new Panel { Dock = DockStyle.Fill, Padding = new Padding(6) };
             var lblSnapHeader = new Label
             {
-                Text = "📅 Session Snapshots:",
+                Text = LanguageManager.GetString("MainForm.SessionSnapshotsHeader", "📅 Session Snapshots:"),
                 Dock = DockStyle.Top,
                 Height = 25,
                 Font = new Font(FontFamily.GenericSansSerif, 9f, FontStyle.Bold)
@@ -7466,9 +7567,9 @@ namespace CsfStudio.UI
             };
 
             var ctxList = new ContextMenuStrip();
-            var itemDelSingle = new ToolStripMenuItem("🗑️ Delete Selected Snapshot");
+            var itemDelSingle = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.DeleteSnapshot", "🗑️ Delete Selected Snapshot"));
             itemDelSingle.Click += (s, e) => PerformDeleteSnapshot(_lstBackupSnapshots.SelectedItem as SessionSnapshot);
-            var itemDelAll = new ToolStripMenuItem("🧹 Clear All Snapshots History");
+            var itemDelAll = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.ClearSnapshots", "🧹 Clear All Snapshots History"));
             itemDelAll.Click += (s, e) => PerformClearAllSnapshots();
             ctxList.Items.Add(itemDelSingle);
             ctxList.Items.Add(new ToolStripSeparator());
@@ -7484,7 +7585,7 @@ namespace CsfStudio.UI
 
             _btnCreateManualBackup = new Button
             {
-                Text = "⚡ Create Snapshot",
+                Text = LanguageManager.GetString("MainForm.CreateSnapshotButton", "⚡ Create Snapshot"),
                 Location = new Point(0, 4),
                 Width = 203,
                 Height = 28,
@@ -7492,17 +7593,21 @@ namespace CsfStudio.UI
             };
             _btnCreateManualBackup.Click += (s, e) =>
             {
-                var snap = BackupManager.CreateSessionSnapshot(_session, "Manual Snapshot", _appConfig.BackupDirectoryPath, _appConfig.SaveInAppData);
+                var snap = BackupManager.CreateSessionSnapshot(_session, LanguageManager.GetString("Backup.Cause.ManualSnapshot", "Manual Snapshot"), _appConfig.BackupDirectoryPath);
                 if (snap != null)
                 {
                     PopulateBackupsTab();
-                    MessageBox.Show("Successfully created a backup snapshot for the active session.", "Backup Created", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(
+                        LanguageManager.GetString("Msg.BackupCreatedSuccess", "Successfully created a backup snapshot for the active session."),
+                        LanguageManager.GetString("Title.BackupCreated", "Backup Created"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
                 }
             };
 
             var btnDeleteSnap = new Button
             {
-                Text = "🗑️ Delete",
+                Text = LanguageManager.GetString("Button.Delete", "🗑️ Delete"),
                 Location = new Point(0, 34),
                 Width = 99,
                 Height = 26
@@ -7511,7 +7616,7 @@ namespace CsfStudio.UI
 
             var btnClearAll = new Button
             {
-                Text = "🧹 Clear All",
+                Text = LanguageManager.GetString("MainForm.ClearAllSnapshotsButton", "🧹 Clear All"),
                 Location = new Point(104, 34),
                 Width = 99,
                 Height = 26
@@ -7548,7 +7653,7 @@ namespace CsfStudio.UI
                 var meta = tab.Tag as BackupTabMeta;
                 bool isBase = meta != null && meta.IsBase;
                 bool isSelected = (_tabBackupFiles.SelectedIndex == e.Index);
-                bool hasChanges = tab.Text.Contains("changes");
+                bool hasChanges = meta != null && meta.HasChanges;
 
                 using (var backBrush = new SolidBrush(isSelected ? Color.FromArgb(245, 247, 250) : SystemColors.Control))
                 {
@@ -7619,12 +7724,19 @@ namespace CsfStudio.UI
         {
             if (snap == null)
             {
-                MessageBox.Show("Please select a backup snapshot to delete.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.SelectBackupToDelete", "Please select a backup snapshot to delete."),
+                    LanguageManager.GetString("Title.NoSelection", "No Selection"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
                 return;
             }
 
-            if (MessageBox.Show($"Are you sure you want to delete the backup snapshot from '{snap.Manifest.CreatedAt:yyyy-MM-dd HH:mm:ss}'?",
-                "Delete Snapshot", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+            if (MessageBox.Show(
+                string.Format(LanguageManager.GetString("Msg.ConfirmDeleteSnapshotFormat", "Are you sure you want to delete the backup snapshot from '{0:yyyy-MM-dd HH:mm:ss}'?"), snap.Manifest.CreatedAt),
+                LanguageManager.GetString("Title.DeleteSnapshot", "Delete Snapshot"),
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning) == DialogResult.Yes)
             {
                 if (BackupManager.DeleteSnapshot(snap))
                 {
@@ -7632,7 +7744,11 @@ namespace CsfStudio.UI
                 }
                 else
                 {
-                    MessageBox.Show("Could not delete the snapshot directory.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show(
+                        LanguageManager.GetString("Msg.CouldNotDeleteSnapshotDir", "Could not delete the snapshot directory."),
+                        LanguageManager.GetString("Title.Error", "Error"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
                 }
             }
         }
@@ -7640,10 +7756,13 @@ namespace CsfStudio.UI
         private void PerformClearAllSnapshots()
         {
             if (_session == null || _session.BaseDocument == null || string.IsNullOrEmpty(_session.BaseDocument.FilePath)) return;
-            if (MessageBox.Show("Are you sure you want to delete ALL backup snapshots for this session history?",
-                "Clear History", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+            if (MessageBox.Show(
+                LanguageManager.GetString("Msg.ConfirmClearAllSnapshots", "Are you sure you want to delete ALL backup snapshots for this session history?"),
+                LanguageManager.GetString("Title.ClearHistory", "Clear History"),
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning) == DialogResult.Yes)
             {
-                BackupManager.DeleteAllSnapshots(_session.BaseDocument.FilePath, _appConfig.BackupDirectoryPath, _appConfig.SaveInAppData);
+                BackupManager.DeleteAllSnapshots(_session.BaseDocument.FilePath, _appConfig.BackupDirectoryPath);
                 PopulateBackupsTab();
             }
         }
@@ -7669,7 +7788,7 @@ namespace CsfStudio.UI
                 _tabBackupFiles.TabPages.Clear();
 
                 string baseFilePath = _session.BaseDocument?.FilePath;
-                var snapshots = BackupManager.GetAvailableSnapshots(baseFilePath, _appConfig.BackupDirectoryPath, _appConfig.SaveInAppData);
+                var snapshots = BackupManager.GetAvailableSnapshots(baseFilePath, _appConfig.BackupDirectoryPath);
 
                 if (snapshots.Count == 0)
                 {
@@ -7710,6 +7829,8 @@ namespace CsfStudio.UI
             public string LangTag;
             public bool IsBase;
             public bool IsPopulated;
+            public bool HasChanges;
+            public int ChangeCount;
         }
 
         private void OnSnapshotSelected()
@@ -7755,7 +7876,7 @@ namespace CsfStudio.UI
                 var diffItems = BackupManager.CompareSnapshotDocWithCurrent(currentSDoc?.Document, backupDoc);
                 int changeCount = diffItems.Count(item => item.DiffType != BackupDiffType.Unchanged);
                 bool hasChanges = changeCount > 0;
-                string changeBadge = hasChanges ? $" ({changeCount} changes)" : string.Empty;
+                string changeBadge = hasChanges ? string.Format(LanguageManager.GetString("MainForm.ChangesCountBadgeFormat", " ({0} changes)"), changeCount) : string.Empty;
 
                 var meta = new BackupTabMeta
                 {
@@ -7767,7 +7888,9 @@ namespace CsfStudio.UI
                     DiffItems = diffItems,
                     LangTag = langTag,
                     IsBase = isBase,
-                    IsPopulated = false
+                    IsPopulated = false,
+                    HasChanges = hasChanges,
+                    ChangeCount = changeCount
                 };
 
                 var tabPg = new TabPage
@@ -7806,14 +7929,14 @@ namespace CsfStudio.UI
             var pnlTabHead = new Panel { Dock = DockStyle.Top, Height = 35 };
             var btnRestoreFile = new Button
             {
-                Text = $"Restore Entire [{meta.LangTag}] File",
+                Text = string.Format(LanguageManager.GetString("MainForm.RestoreEntireFileFormat", "Restore Entire [{0}] File"), meta.LangTag),
                 Location = new Point(5, 5),
                 Width = 190,
                 Height = 25
             };
             var btnRestoreSession = new Button
             {
-                Text = "Restore Full Session",
+                Text = LanguageManager.GetString("MainForm.RestoreFullSessionButton", "Restore Full Session"),
                 Location = new Point(205, 5),
                 Width = 170,
                 Height = 25
@@ -7842,12 +7965,12 @@ namespace CsfStudio.UI
 
             gridDiff.DefaultCellStyle.WrapMode = DataGridViewTriState.True;
 
-            var colStatus = new DataGridViewTextBoxColumn { HeaderText = "Status", Width = 125, AutoSizeMode = DataGridViewAutoSizeColumnMode.None };
-            var colKey = new DataGridViewTextBoxColumn { HeaderText = "Key Name", Width = 180, AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells };
-            var colCurrText = new DataGridViewTextBoxColumn { HeaderText = "Current Text", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill };
-            var colBakText = new DataGridViewTextBoxColumn { HeaderText = "Old Text", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill };
-            var colCurrWav = new DataGridViewTextBoxColumn { HeaderText = "Current Audio", Width = 70, AutoSizeMode = DataGridViewAutoSizeColumnMode.None };
-            var colBakWav = new DataGridViewTextBoxColumn { HeaderText = "Old Audio", Width = 70, AutoSizeMode = DataGridViewAutoSizeColumnMode.None };
+            var colStatus = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Grid.Column.Status", "Status"), Width = 125, AutoSizeMode = DataGridViewAutoSizeColumnMode.None };
+            var colKey = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Grid.Column.Key", "Key Name"), Width = 180, AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells };
+            var colCurrText = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Backups.ColCurrentText", "Current Text"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill };
+            var colBakText = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Backups.ColOldText", "Old Text"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill };
+            var colCurrWav = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Backups.ColCurrentAudio", "Current Audio"), Width = 70, AutoSizeMode = DataGridViewAutoSizeColumnMode.None };
+            var colBakWav = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Backups.ColOldAudio", "Old Audio"), Width = 70, AutoSizeMode = DataGridViewAutoSizeColumnMode.None };
 
             gridDiff.Columns.AddRange(colStatus, colKey, colCurrText, colBakText, colCurrWav, colBakWav);
 
@@ -7916,7 +8039,7 @@ namespace CsfStudio.UI
 
             // Context Menu on Grid to Restore Selected Key Entry(ies)
             var ctxRow = new ContextMenuStrip();
-            var itemRestoreKey = new ToolStripMenuItem("Restore Selected Key Entry(ies) from Backup");
+            var itemRestoreKey = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.RestoreKeyBackup", "Restore Selected Key Entry(ies) from Backup"));
             itemRestoreKey.Click += (s, e) =>
             {
                 if (gridDiff.SelectedRows.Count == 0 || meta.CurrentSDoc == null) return;
@@ -7929,12 +8052,16 @@ namespace CsfStudio.UI
                 if (selectedDiffItems.Count == 0) return;
 
                 string confirmMsg = selectedDiffItems.Count == 1
-                    ? $"Are you sure you want to restore key '{selectedDiffItems[0].KeyName}' in [{meta.LangTag}] from this backup snapshot?"
-                    : $"Are you sure you want to restore {selectedDiffItems.Count} selected keys in [{meta.LangTag}] from this backup snapshot?";
+                    ? string.Format(LanguageManager.GetString("Msg.ConfirmRestoreSingleKeyFormat", "Are you sure you want to restore key '{0}' in [{1}] from this backup snapshot?"), selectedDiffItems[0].KeyName, meta.LangTag)
+                    : string.Format(LanguageManager.GetString("Msg.ConfirmRestorePluralKeysFormat", "Are you sure you want to restore {0} selected keys in [{1}] from this backup snapshot?"), selectedDiffItems.Count, meta.LangTag);
 
-                if (MessageBox.Show(confirmMsg, "Restore Selected Keys", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                if (MessageBox.Show(
+                    confirmMsg,
+                    LanguageManager.GetString("Title.RestoreSelectedKeys", "Restore Selected Keys"),
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question) == DialogResult.Yes)
                 {
-                    BackupManager.CreateSessionSnapshot(_session, $"Pre-Restore {selectedDiffItems.Count} Keys", _appConfig.BackupDirectoryPath, _appConfig.SaveInAppData);
+                    BackupManager.CreateSessionSnapshot(_session, string.Format(LanguageManager.GetString("Backup.Cause.PreRestoreKeysFormat", "Pre-Restore {0} Keys"), selectedDiffItems.Count), _appConfig.BackupDirectoryPath);
 
                     int restoredCount = 0;
                     foreach (var diffItem in selectedDiffItems)
@@ -7960,7 +8087,11 @@ namespace CsfStudio.UI
                         meta.CurrentSDoc.IsModified = true;
                         RebuildCategoryTreeAndGrid();
                         PopulateBackupsTab();
-                        MessageBox.Show($"Restored {restoredCount} key(s) in [{meta.LangTag}] from backup snapshot.", "Keys Restored", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        MessageBox.Show(
+                            string.Format(LanguageManager.GetString("Msg.RestoredKeysCountFormat", "Restored {0} key(s) in [{1}] from backup snapshot."), restoredCount, meta.LangTag),
+                            LanguageManager.GetString("Title.KeysRestored", "Keys Restored"),
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
                     }
                 }
             };
@@ -7971,9 +8102,13 @@ namespace CsfStudio.UI
             btnRestoreFile.Click += (s, e) =>
             {
                 if (meta.CurrentSDoc == null || meta.BackupDoc == null) return;
-                if (MessageBox.Show($"Are you sure you want to restore the entire [{meta.LangTag}] file from this snapshot?", "Restore File", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                if (MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Msg.ConfirmRestoreEntireFileFormat", "Are you sure you want to restore the entire [{0}] file from this snapshot?"), meta.LangTag),
+                    LanguageManager.GetString("Title.RestoreFile", "Restore File"),
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question) == DialogResult.Yes)
                 {
-                    BackupManager.CreateSessionSnapshot(_session, $"Pre-Restore File [{meta.LangTag}]", _appConfig.BackupDirectoryPath, _appConfig.SaveInAppData);
+                    BackupManager.CreateSessionSnapshot(_session, string.Format(LanguageManager.GetString("Backup.Cause.PreRestoreFileFormat", "Pre-Restore File [{0}]"), meta.LangTag), _appConfig.BackupDirectoryPath);
                     meta.CurrentSDoc.Document.Labels.Clear();
                     foreach (var l in meta.BackupDoc.Labels) meta.CurrentSDoc.Document.Labels.Add(l.Clone());
                     meta.CurrentSDoc.Document.Version = meta.BackupDoc.Version;
@@ -7981,16 +8116,24 @@ namespace CsfStudio.UI
                     meta.CurrentSDoc.IsModified = true;
                     RebuildCategoryTreeAndGrid();
                     PopulateBackupsTab();
-                    MessageBox.Show($"Restored file [{meta.LangTag}] from snapshot.", "File Restored", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(
+                        string.Format(LanguageManager.GetString("Msg.RestoredFileFormat", "Restored file [{0}] from snapshot."), meta.LangTag),
+                        LanguageManager.GetString("Title.FileRestored", "File Restored"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
                 }
             };
 
             // Full Session Restoration Button
             btnRestoreSession.Click += (s, e) =>
             {
-                if (MessageBox.Show("Are you sure you want to restore the ENTIRE SESSION (all files) to this backup snapshot?", "Restore Full Session", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+                if (MessageBox.Show(
+                    LanguageManager.GetString("Msg.ConfirmRestoreFullSession", "Are you sure you want to restore the ENTIRE SESSION (all files) to this backup snapshot?"),
+                    LanguageManager.GetString("Title.RestoreFullSession", "Restore Full Session"),
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning) == DialogResult.Yes)
                 {
-                    BackupManager.CreateSessionSnapshot(_session, "Pre-Restore Full Session", _appConfig.BackupDirectoryPath, _appConfig.SaveInAppData);
+                    BackupManager.CreateSessionSnapshot(_session, LanguageManager.GetString("Backup.Cause.PreRestoreFullSession", "Pre-Restore Full Session"), _appConfig.BackupDirectoryPath);
                     foreach (var fName in meta.Snapshot.Manifest.FileNames)
                     {
                         string fPath = Path.Combine(meta.Snapshot.SnapshotFolderPath, fName);
@@ -8010,7 +8153,11 @@ namespace CsfStudio.UI
                     }
                     RebuildCategoryTreeAndGrid();
                     PopulateBackupsTab();
-                    MessageBox.Show("Restored all open CSF files in session from backup snapshot.", "Session Restored", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(
+                        LanguageManager.GetString("Msg.RestoredFullSessionSuccess", "Restored all open CSF files in session from backup snapshot."),
+                        LanguageManager.GetString("Title.SessionRestored", "Session Restored"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
                 }
             };
 
@@ -8018,7 +8165,7 @@ namespace CsfStudio.UI
             {
                 var lblNoDiff = new Label
                 {
-                    Text = "🟢 No text or audio differences found for this file compared to the backup snapshot.",
+                    Text = LanguageManager.GetString("MainForm.NoBackupDifferencesFound", "🟢 No text or audio differences found for this file compared to the backup snapshot."),
                     Dock = DockStyle.Fill,
                     TextAlign = ContentAlignment.MiddleCenter,
                     Font = new Font(FontFamily.GenericSansSerif, 9.5f, FontStyle.Italic),
@@ -8057,7 +8204,11 @@ namespace CsfStudio.UI
                         }
                     }
                     RebuildCategoryTreeAndGrid();
-                    MessageBox.Show($"Renamed {renamed} keys.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(
+                        string.Format(LanguageManager.GetString("Msg.RenamedKeysCountFormat", "Renamed {0} key(s)."), renamed),
+                        LanguageManager.GetString("Title.Success", "Success"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
                 }
             }
         }
@@ -8085,7 +8236,11 @@ namespace CsfStudio.UI
                 }
             }
             RebuildCategoryTreeAndGrid();
-            MessageBox.Show($"Trimmed leading/trailing spaces in {trimmed} strings.", "Trim Tool", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(
+                string.Format(LanguageManager.GetString("Msg.TrimmedSpacesCountFormat", "Trimmed leading/trailing spaces in {0} strings."), trimmed),
+                LanguageManager.GetString("Title.TrimTool", "Trim Tool"),
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
 
         private void menuRenameFileLabel_Click(object sender, EventArgs e)
@@ -8093,7 +8248,11 @@ namespace CsfStudio.UI
             var targetDoc = _session?.BaseDocument ?? _session?.Documents.FirstOrDefault();
             if (targetDoc == null)
             {
-                MessageBox.Show("No CSF file is currently open.", "Rename File Label", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.NoCsfFileOpen", "No CSF file is currently open."),
+                    LanguageManager.GetString("Title.RenameFileLabel", "Rename File Label"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
                 return;
             }
             PromptRenameFileLabel(targetDoc);
@@ -8135,13 +8294,14 @@ namespace CsfStudio.UI
                 // Multi-doc: one sub-item per document showing current header lang
                 foreach (var doc in _session.Documents)
                 {
+                    string docFallback = string.Format(LanguageManager.GetString("MainForm.DocumentLanguageTagFormat", "Document [{0}]"), doc.LanguageTag);
                     string fileName = doc.FileName ?? (string.IsNullOrEmpty(doc.FilePath)
-                        ? $"Document [{doc.LanguageTag}]"
+                        ? docFallback
                         : Path.GetFileName(doc.FilePath));
                     string currHeader = doc.Document != null
                         ? $"{doc.Document.Language} ({(int)doc.Document.Language})"
-                        : "Unknown";
-                    string itemText = $"📄 {fileName} [{doc.LanguageTag}] (Header: {currHeader})";
+                        : LanguageManager.GetString("Text.Unknown", "Unknown");
+                    string itemText = string.Format(LanguageManager.GetString("MainForm.MenuChangeHeaderItemFormat", "📄 {0} [{1}] (Header: {2})"), fileName, doc.LanguageTag, currHeader);
 
                     var subItem = new ToolStripMenuItem(itemText);
                     CsfSessionDocument targetDoc = doc;
@@ -8161,14 +8321,22 @@ namespace CsfStudio.UI
             var baseDoc = _session.BaseDocument ?? _session.Documents.FirstOrDefault();
             if (baseDoc == null || baseDoc.Document == null)
             {
-                MessageBox.Show("No active session or base reference file loaded.", "Reorder Keys Tool", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.NoActiveSessionOrBaseFile", "No active session or base reference file loaded."),
+                    LanguageManager.GetString("Title.ReorderKeysTool", "Reorder Keys Tool"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
                 return;
             }
 
             var baseSequence = baseDoc.Document.Labels.Select(l => l.Name).ToList();
             if (baseSequence.Count == 0)
             {
-                MessageBox.Show("The base reference file contains no keys to sort by.", "Reorder Keys Tool", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.BaseFileNoKeysToSort", "The base reference file contains no keys to sort by."),
+                    LanguageManager.GetString("Title.ReorderKeysTool", "Reorder Keys Tool"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
                 return;
             }
 
@@ -8197,15 +8365,22 @@ namespace CsfStudio.UI
 
             OnSessionUpdated();
             RebuildCategoryTreeAndGrid();
-            MessageBox.Show($"Reordered physical key sequence in {totalFilesReordered} open file(s) matching the reference sequence of [{baseDoc.LanguageTag}] ({baseDoc.FileName}).",
-                "Reorder Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(
+                string.Format(LanguageManager.GetString("Msg.ReorderedKeysSuccessFormat", "Reordered physical key sequence in {0} open file(s) matching the reference sequence of [{1}] ({2})."), totalFilesReordered, baseDoc.LanguageTag, baseDoc.FileName),
+                LanguageManager.GetString("Title.ReorderComplete", "Reorder Complete"),
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
 
         private void menuClearValuesKeepKeys_Click(object sender, EventArgs e)
         {
             if (_session.Documents.Count == 0)
             {
-                MessageBox.Show("No CSF files are currently open in the session.", "Clear Values & Audio", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.NoCsfFilesOpenInSession", "No CSF files are currently open in the session."),
+                    LanguageManager.GetString("Title.ClearValuesAndAudio", "Clear Values & Audio"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
                 return;
             }
 
@@ -8220,7 +8395,7 @@ namespace CsfStudio.UI
                 // Multi-document session: prompt user to select which file to clear, or ALL files
                 using (var dlg = new Form())
                 {
-                    dlg.Text = "Select Target CSF File to Clear";
+                    dlg.Text = LanguageManager.GetString("ClearValues.Title", "Select Target CSF File to Clear");
                     dlg.Size = new System.Drawing.Size(420, 190);
                     dlg.StartPosition = FormStartPosition.CenterParent;
                     dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -8230,7 +8405,7 @@ namespace CsfStudio.UI
 
                     var lblPrompt = new Label
                     {
-                        Text = "Select the open CSF document from which to erase text values and audio references:",
+                        Text = LanguageManager.GetString("ClearValues.Prompt", "Select the open CSF document from which to erase text values and audio references:"),
                         Location = new System.Drawing.Point(15, 15),
                         Size = new System.Drawing.Size(375, 35),
                         Font = new System.Drawing.Font("Segoe UI", 9F)
@@ -8246,15 +8421,15 @@ namespace CsfStudio.UI
 
                     foreach (var doc in _session.Documents)
                     {
-                        string isMain = doc == _session.BaseDocument ? " 📌 [BASE]" : "";
-                        cmbDocs.Items.Add($"[{doc.LanguageTag}]{isMain} - {Path.GetFileName(doc.FilePath)} ({doc.Document.Labels.Count:N0} keys)");
+                        string isMain = doc == _session.BaseDocument ? LanguageManager.GetString("Text.BaseTagSuffix", " 📌 [BASE]") : "";
+                        cmbDocs.Items.Add(string.Format(LanguageManager.GetString("ClearValues.DocItemFormat", "[{0}]{1} - {2} ({3:N0} keys)"), doc.LanguageTag, isMain, Path.GetFileName(doc.FilePath), doc.Document.Labels.Count));
                     }
-                    cmbDocs.Items.Add("⚠️ [ALL OPEN FILES IN SESSION]");
+                    cmbDocs.Items.Add(LanguageManager.GetString("ClearValues.AllOpenFilesItem", "⚠️ [ALL OPEN FILES IN SESSION]"));
                     cmbDocs.SelectedIndex = 0;
 
                     var btnOk = new Button
                     {
-                        Text = "Select & Continue",
+                        Text = LanguageManager.GetString("Button.SelectContinue", "Select & Continue"),
                         DialogResult = DialogResult.OK,
                         Location = new System.Drawing.Point(155, 105),
                         Size = new System.Drawing.Size(130, 28),
@@ -8263,7 +8438,7 @@ namespace CsfStudio.UI
 
                     var btnCancel = new Button
                     {
-                        Text = "Cancel",
+                        Text = LanguageManager.GetString("Button.Cancel", "Cancel"),
                         DialogResult = DialogResult.Cancel,
                         Location = new System.Drawing.Point(295, 105),
                         Size = new System.Drawing.Size(95, 28)
@@ -8295,16 +8470,8 @@ namespace CsfStudio.UI
                 : _session.Documents.Sum(d => d.Document.Labels.Count);
 
             var confirm = MessageBox.Show(
-                $"⚠️ DESTRUCTIVE ACTION WARNING!\n\n" +
-                $"You are about to erase all text values and audio references from:\n" +
-                $"• Target: {targetDesc}\n" +
-                $"• Affected Keys: {affectedKeys:N0}\n\n" +
-                $"Actions that will be executed against the target file:\n" +
-                $"1. All string text values will be emptied (Value = \"\").\n" +
-                $"2. All audio WAV references (Sound) will be removed.\n" +
-                $"3. Only the key label structure (Label Names) will be preserved.\n\n" +
-                $"Do you really want to clear all values from {targetDesc}?",
-                "Confirm Clear Text & Audio Values",
+                string.Format(LanguageManager.GetString("Msg.ConfirmClearValuesFormat", "⚠️ DESTRUCTIVE ACTION WARNING!\n\nYou are about to erase all text values and audio references from:\n• Target: {0}\n• Affected Keys: {1:N0}\n\nActions that will be executed against the target file:\n1. All string text values will be emptied (Value = \"\").\n2. All audio WAV references (Sound) will be removed.\n3. Only the key label structure (Label Names) will be preserved.\n\nDo you really want to clear all values from {0}?"), targetDesc, affectedKeys),
+                LanguageManager.GetString("Title.ConfirmClearValues", "Confirm Clear Text & Audio Values"),
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning,
                 MessageBoxDefaultButton.Button2);
@@ -8327,8 +8494,11 @@ namespace CsfStudio.UI
             OnSessionUpdated();
             RebuildCategoryTreeAndGrid();
 
-            MessageBox.Show($"Text values and audio references successfully cleared from {targetDesc}.\nThe key structure has been preserved.",
-                "Operation Completed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(
+                string.Format(LanguageManager.GetString("Msg.ClearValuesSuccessFormat", "Text values and audio references successfully cleared from {0}.\nThe key structure has been preserved."), targetDesc),
+                LanguageManager.GetString("Title.OperationCompleted", "Operation Completed"),
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
         }
 
         private void ClearDocValuesAndAudio(CsfSessionDocument sDoc)
@@ -8361,7 +8531,8 @@ namespace CsfStudio.UI
                 foreach (var kvp in _recentKeyTimestamps.OrderByDescending(k => k.Value))
                 {
                     masterMap.TryGetValue(kvp.Key, out var mRow);
-                    string cat = mRow?.Category ?? (kvp.Key.Contains(":") ? kvp.Key.Substring(0, kvp.Key.IndexOf(':') + 1) : "Uncategorized");
+                    string uncategorizedText = LanguageManager.GetString("Grid.Category.Uncategorized", "Uncategorized");
+                    string cat = mRow?.Category ?? (kvp.Key.Contains(":") ? kvp.Key.Substring(0, kvp.Key.IndexOf(':') + 1) : uncategorizedText);
 
                     int idx = gridRecent.Rows.Add(kvp.Key, cat, kvp.Value.ToString("yyyy-MM-dd HH:mm:ss"));
                     gridRecent.Rows[idx].Tag = mRow;
@@ -8507,6 +8678,7 @@ namespace CsfStudio.UI
             _recentKeyTimestamps[keyName] = DateTime.Now;
             _unsavedDirty = true;
             _coverageDirty = true;
+            _recentDirty = true;
 
             if (_isSyncingSelection) return;
 
@@ -8514,19 +8686,6 @@ namespace CsfStudio.UI
             {
                 gridLabels.Invalidate();
             }
-
-            if (gridRecent != null && gridRecent.IsHandleCreated)
-            {
-                gridRecent.BeginInvoke((Action)PopulateRecentGrid);
-            }
-
-            if (tabControlMain?.SelectedTab == tabCoverage)
-            {
-                PopulateCoverageMatrixTab();
-                _coverageDirty = false;
-            }
-
-            UpdateUIForSessionMode();
         }
 
         private bool IsKeyModifiedInDoc(string langTag, string keyName)
@@ -8541,46 +8700,63 @@ namespace CsfStudio.UI
         private void menuSaveAs_Click(object sender, EventArgs e) => SaveAllDocuments(true);
         private void menuExit_Click(object sender, EventArgs e) => Close();
 
-        private void InitializeControlToolTips()
+        private void ApplyControlToolTips()
         {
             // --- TOP MENUS ---
-            ToolTipHelper.SetToolTip(menuNew, "New CSF: Create a new session with a blank CSF string table file.");
-            ToolTipHelper.SetToolTip(menuOpen, "Open CSF File: Load an existing Command & Conquer .CSF string table file from your computer.");
-            ToolTipHelper.SetToolTip(menuOpenSession, "Open Session: Open a saved project session containing multiple associated CSF text tables.");
-            ToolTipHelper.SetToolTip(menuRecentSessions, "Recent Sessions: Access recently opened CSF projects and session files.");
-            ToolTipHelper.SetToolTip(menuSave, "Save: Save all unsaved text and extra audio modifications to disk for open CSF files.");
-            ToolTipHelper.SetToolTip(menuSaveSingleFile, "Save Single File: Save changes for the currently active CSF file only.");
-            ToolTipHelper.SetToolTip(menuSaveAs, "Save As: Save the currently selected CSF file under a new filename or location.");
-            ToolTipHelper.SetToolTip(menuExportTxt, "Export to TXT: Export string entries to a plain text UTF-8 (.TXT) file readable in Notepad or external editors.");
-            ToolTipHelper.SetToolTip(menuExportKeysOnly, "Export Key Structure Only: Export only the list of key label names without any text content to a plain text UTF-8 (.TXT) file.");
-            ToolTipHelper.SetToolTip(menuImportTxt, "Import from TXT: Import string entries from a UTF-8 text file to update matching key entries in open CSFs.");
-            ToolTipHelper.SetToolTip(menuExit, "Exit Application: Close and exit the CSF Studio editor.");
+            if (menuNew != null) ToolTipHelper.SetToolTip(menuNew, LanguageManager.GetString("ToolTip.MenuNew", "New CSF: Create a new session with a blank CSF string table file."));
+            if (menuOpen != null) ToolTipHelper.SetToolTip(menuOpen, LanguageManager.GetString("ToolTip.MenuOpen", "Open CSF File: Load an existing Command & Conquer .CSF string table file from your computer."));
+            if (menuOpenSession != null) ToolTipHelper.SetToolTip(menuOpenSession, LanguageManager.GetString("ToolTip.MenuOpenSession", "Open Session: Open a saved project session containing multiple associated CSF text tables."));
+            if (menuRecentSessions != null) ToolTipHelper.SetToolTip(menuRecentSessions, LanguageManager.GetString("ToolTip.MenuRecentSessions", "Recent Sessions: Access recently opened CSF projects and session files."));
+            if (menuSave != null) ToolTipHelper.SetToolTip(menuSave, LanguageManager.GetString("ToolTip.MenuSave", "Save All: Save all text and audio changes to disk across all open CSF files."));
+            if (menuSaveSingleFile != null) ToolTipHelper.SetToolTip(menuSaveSingleFile, LanguageManager.GetString("ToolTip.MenuSaveSingleFile", "Save Single File: Save changes for the currently active CSF file only."));
+            if (menuSaveAs != null) ToolTipHelper.SetToolTip(menuSaveAs, LanguageManager.GetString("ToolTip.MenuSaveAs", "Save As: Save the currently selected CSF file under a new filename or location."));
+            if (menuExportTxt != null) ToolTipHelper.SetToolTip(menuExportTxt, LanguageManager.GetString("ToolTip.MenuExportTxt", "Export to TXT: Export string entries to a plain text UTF-8 (.TXT) file readable in Notepad or external editors."));
+            if (menuExportKeysOnly != null) ToolTipHelper.SetToolTip(menuExportKeysOnly, LanguageManager.GetString("ToolTip.MenuExportKeysOnly", "Export Key Structure Only: Export only the list of key label names without any text content to a plain text UTF-8 (.TXT) file."));
+            if (menuImportTxt != null) ToolTipHelper.SetToolTip(menuImportTxt, LanguageManager.GetString("ToolTip.MenuImportTxt", "Import from TXT: Import string entries from a UTF-8 text file to update matching key entries in open CSFs."));
+            if (menuExit != null) ToolTipHelper.SetToolTip(menuExit, LanguageManager.GetString("ToolTip.MenuExit", "Exit Application: Close and exit the CSF Studio editor."));
 
-            ToolTipHelper.SetToolTip(menuAddLabel, "Add New Key: Create a new string key entry slot across all open CSF files in the active session.");
-            ToolTipHelper.SetToolTip(menuDeleteLabel, "Delete Key: Permanently remove selected key entries from open CSF files.");
-            ToolTipHelper.SetToolTip(menuBatchRename, "Batch Rename: Rename multiple key prefixes or replace text patterns in key names simultaneously across all open CSFs.");
-            ToolTipHelper.SetToolTip(menuTrimSpaces, "Trim Spaces: Automatically trim leading and trailing spaces from text string values in all open files.");
-            ToolTipHelper.SetToolTip(menuRenameFileLabel, "Rename File Label: Edit the display title or language label assigned to the active CSF file.");
-            ToolTipHelper.SetToolTip(menuChangeHeaderLangId, "Change Header Language ID: Modify the 32-bit binary language ID stored at offset 0x14 in the CSF binary header.");
-            ToolTipHelper.SetToolTip(menuJumpNextEmpty, "Jump to Next Empty Key: Move selection to the next key entry with empty or missing text content (Ctrl+Shift+Down).");
-            ToolTipHelper.SetToolTip(menuJumpPrevEmpty, "Jump to Previous Empty Key: Move selection to the previous key entry with empty or missing text content (Ctrl+Shift+Up).");
-            ToolTipHelper.SetToolTip(menuFindReplace, "Find & Replace: Search for specific text patterns or key names and replace them across open files.");
+            if (menuAddLabel != null) ToolTipHelper.SetToolTip(menuAddLabel, LanguageManager.GetString("ToolTip.MenuAddLabel", "Add New Key: Create a new string key entry slot across all open CSF files in the active session."));
+            if (menuDeleteLabel != null) ToolTipHelper.SetToolTip(menuDeleteLabel, LanguageManager.GetString("ToolTip.MenuDeleteLabel", "Delete Key: Permanently remove selected key entries from open CSF files."));
+            if (menuBatchRename != null) ToolTipHelper.SetToolTip(menuBatchRename, LanguageManager.GetString("ToolTip.MenuBatchRename", "Batch Rename: Rename multiple key prefixes or replace text patterns in key names simultaneously across all open CSFs."));
+            if (menuTrimSpaces != null) ToolTipHelper.SetToolTip(menuTrimSpaces, LanguageManager.GetString("ToolTip.MenuTrimSpaces", "Trim Spaces: Automatically trim leading and trailing spaces from text string values in all open files."));
+            if (menuRenameFileLabel != null) ToolTipHelper.SetToolTip(menuRenameFileLabel, LanguageManager.GetString("ToolTip.MenuRenameFileLabel", "Rename File Label: Edit the display title or language label assigned to the active CSF file."));
+            if (menuChangeHeaderLangId != null) ToolTipHelper.SetToolTip(menuChangeHeaderLangId, LanguageManager.GetString("ToolTip.MenuChangeHeaderLangId", "Change Header Language ID: Modify the 32-bit binary language ID stored at offset 0x14 in the CSF binary header."));
+            if (menuJumpNextEmpty != null) ToolTipHelper.SetToolTip(menuJumpNextEmpty, LanguageManager.GetString("ToolTip.MenuJumpNextEmpty", "Jump to Next Empty Key: Move selection to the next key entry with empty or missing text content (Ctrl+Shift+Down)."));
+            if (menuJumpPrevEmpty != null) ToolTipHelper.SetToolTip(menuJumpPrevEmpty, LanguageManager.GetString("ToolTip.MenuJumpPrevEmpty", "Jump to Previous Empty Key: Move selection to the previous key entry with empty or missing text content (Ctrl+Shift+Up)."));
+            if (menuFindReplace != null) ToolTipHelper.SetToolTip(menuFindReplace, LanguageManager.GetString("ToolTip.MenuFindReplace", "Find & Replace: Search for specific text patterns or key names and replace them across open files."));
 
-            ToolTipHelper.SetToolTip(menuScanIni, "Scan INI & MAP Files: Scan C&C game .INI configuration files or map files (.MAP) to detect missing CSF string references.");
-            ToolTipHelper.SetToolTip(menuConvertAnsi, "Convert ANSI / Codepage Text to Unicode: Convert raw ANSI codepage text entries across open CSF files to standard Unicode characters.");
-            ToolTipHelper.SetToolTip(menuSortBinary, "Reorder Keys by Main CSF File Sequence: Physically reorder key entries in all open CSF documents matching the exact sequence of the Main CSF file.");
-            ToolTipHelper.SetToolTip(menuClearValuesKeepKeys, "Clear Text & Audio: Erase all string text values and audio references from a chosen CSF document while preserving the key structure.");
-            ToolTipHelper.SetToolTip(menuAbout, "About CSF Studio: Display application version, format specification details, and credits.");
+            if (menuScanIni != null) ToolTipHelper.SetToolTip(menuScanIni, LanguageManager.GetString("ToolTip.MenuScanIni", "Scan INI & MAP Files: Scan C&C game .INI configuration files or map files (.MAP) to detect missing CSF string references."));
+            if (menuConvertAnsi != null) ToolTipHelper.SetToolTip(menuConvertAnsi, LanguageManager.GetString("ToolTip.MenuConvertAnsi", "Convert ANSI / Codepage Text to Unicode: Convert raw ANSI codepage text entries across open CSF files to standard Unicode characters."));
+            if (menuSortBinary != null) ToolTipHelper.SetToolTip(menuSortBinary, LanguageManager.GetString("ToolTip.MenuSortBinary", "Reorder Keys by Main CSF File Sequence: Physically reorder key entries in all open CSF documents matching the exact sequence of the Main CSF file."));
+            if (menuClearValuesKeepKeys != null) ToolTipHelper.SetToolTip(menuClearValuesKeepKeys, LanguageManager.GetString("ToolTip.MenuClearValuesKeepKeys", "Clear Text & Audio: Erase all string text values and audio references from a chosen CSF document while preserving the key structure."));
+            if (menuAbout != null) ToolTipHelper.SetToolTip(menuAbout, LanguageManager.GetString("ToolTip.MenuAbout", "About CSF Studio: Display application version, format specification details, and credits."));
 
             // --- TOOLBAR BUTTONS & CONTROLS ---
-            ToolTipHelper.SetToolTip(btnAddKeyToolbar, "Add Key: Create a new string entry slot across all open CSF files");
-            ToolTipHelper.SetToolTip(btnDuplicateKeyToolbar, "Duplicate Key: Clone the selected key(s) with a new suffix");
-            ToolTipHelper.SetToolTip(btnDeleteKeyToolbar, "Delete Key: Remove selected key entries from open CSF files");
-            ToolTipHelper.SetToolTip(btnJumpPrevEmptyToolbar, "Jump to Previous Empty Key: Move selection to previous key with empty or missing text (Ctrl+Shift+Up)");
-            ToolTipHelper.SetToolTip(btnJumpNextEmptyToolbar, "Jump to Next Empty Key: Move selection to next key with empty or missing text (Ctrl+Shift+Down)");
-            btnFilterLogic.Text = "OR";
-            ToolTipHelper.SetToolTip(btnFilterLogic, "Filter Combination (OR / AND): Toggle whether searching requires EITHER key OR text filter (OR default), or BOTH key AND text filters (AND)");
-            ToolTipHelper.SetToolTip(cboStatusFilter, "Filter Grid Rows by Key Status:\n🎯 All Statuses (Show all string table entries)\n🔴 Missing Keys Only (Key missing in one or more open CSF files)\n🟡 Empty Strings Only (Key exists, but string text is blank)\n🟢 Complete Keys Only (Key exists in all open CSF files with valid text)");
+            if (cboFileFilter != null) ToolTipHelper.SetToolTip(cboFileFilter, LanguageManager.GetString("ToolTip.CboFileFilter", "Select view mode: View all open CSF files side-by-side or focus on a single CSF file with missing key red highlighting."));
+            if (btnAddKeyToolbar != null) ToolTipHelper.SetToolTip(btnAddKeyToolbar, LanguageManager.GetString("ToolTip.ToolbarAddKey", "Add Key: Create a new string entry slot across all open CSF files"));
+            if (btnDuplicateKeyToolbar != null) ToolTipHelper.SetToolTip(btnDuplicateKeyToolbar, LanguageManager.GetString("ToolTip.ToolbarDuplicateKey", "Duplicate Key: Clone the selected key(s) with a new suffix"));
+            if (btnDeleteKeyToolbar != null) ToolTipHelper.SetToolTip(btnDeleteKeyToolbar, LanguageManager.GetString("ToolTip.ToolbarDeleteKey", "Delete Key: Remove selected key entries from open CSF files"));
+            if (btnJumpPrevEmptyToolbar != null) ToolTipHelper.SetToolTip(btnJumpPrevEmptyToolbar, LanguageManager.GetString("ToolTip.ToolbarJumpPrevEmpty", "Jump to Previous Empty Key: Move selection to previous key with empty or missing text (Ctrl+Shift+Up)"));
+            if (btnJumpNextEmptyToolbar != null) ToolTipHelper.SetToolTip(btnJumpNextEmptyToolbar, LanguageManager.GetString("ToolTip.ToolbarJumpNextEmpty", "Jump to Next Empty Key: Move selection to next key with empty or missing text (Ctrl+Shift+Down)"));
+            if (btnFilterLogic != null)
+            {
+                btnFilterLogic.Text = _filterLogicAnd ? LanguageManager.GetString("Filter.Logic.And", "AND") : LanguageManager.GetString("Filter.Logic.Or", "OR");
+                string filterTip = _filterLogicAnd
+                    ? LanguageManager.GetString("ToolTip.ToolbarFilterLogicAnd", "Filter Logic: AND (Showing rows matching BOTH key AND text filters). Click to toggle to OR mode.")
+                    : LanguageManager.GetString("ToolTip.ToolbarFilterLogicOr", "Filter Logic: OR (Showing rows matching key OR text filter). Click to toggle to AND mode.");
+                ToolTipHelper.SetToolTip(btnFilterLogic, filterTip);
+            }
+            if (cboStatusFilter != null) ToolTipHelper.SetToolTip(cboStatusFilter, LanguageManager.GetString("ToolTip.ToolbarStatusFilter", "Filter Grid Rows by Key Status:\n🎯 All Statuses (Show all string table entries)\n🔴 Missing Keys Only (Key missing in one or more open CSF files)\n🟡 Empty Strings Only (Key exists, but string text is blank)\n🟢 Complete Keys Only (Key exists in all open CSF files with valid text)"));
+
+            // Inspector
+            if (lblCurrentKey != null) ToolTipHelper.SetToolTip(_toolTip, lblCurrentKey, LanguageManager.GetString("ToolTip.Inspector.CurrentKey", "Selected C&C CSF Label / Key Name"));
+            if (txtCurrentKeyName != null) ToolTipHelper.SetToolTip(_toolTip, txtCurrentKeyName, LanguageManager.GetString("ToolTip.Inspector.KeyNameField", "Key Name Field: Type a new key name and click Apply Rename (or press Enter) to update across all loaded CSFs"));
+            if (btnApplyRename != null) ToolTipHelper.SetToolTip(_toolTip, btnApplyRename, LanguageManager.GetString("ToolTip.Inspector.ApplyRename", "Apply Rename: Update this key name across all open CSF files (checks for duplicate names)"));
+            if (tvCategories != null) ToolTipHelper.SetToolTip(_toolTip, tvCategories, LanguageManager.GetString("ToolTip.Inspector.CategoryTree", "Category Tree: Click any category prefix (e.g. GUI, MISSION, No category) to filter keys by prefix"));
+
+            // Coverage Tab
+            if (_chkShowFullCoverage != null) ToolTipHelper.SetToolTip(_toolTip, _chkShowFullCoverage, LanguageManager.GetString("ToolTip.Coverage.ShowFull", "Show 100% Complete Keys: When enabled, includes keys that have valid non-empty translations across all open CSF documents. When disabled, hides fully translated keys to focus on missing translations."));
+            if (_chkShowEmptyEntries != null) ToolTipHelper.SetToolTip(_toolTip, _chkShowEmptyEntries, LanguageManager.GetString("ToolTip.Coverage.ShowEmpty", "Show 0% Empty Entries: When enabled, includes keys that have no text content across all open CSF documents. When disabled, hides completely empty keys."));
 
             toolStrip1.GripStyle = ToolStripGripStyle.Hidden;
             toolStrip1.ShowItemToolTips = true;
@@ -8724,10 +8900,10 @@ namespace CsfStudio.UI
             UpdateFilterButtonsUI();
 
             // --- DETAIL INSPECTOR & EDITORS ---
-            ToolTipHelper.SetToolTip(_toolTip, lblCurrentKey, "Selected C&C CSF Label / Key Name");
-            ToolTipHelper.SetToolTip(_toolTip, txtCurrentKeyName, "Key Name Field: Type a new key name and click Apply Rename (or press Enter) to update across all loaded CSFs");
-            ToolTipHelper.SetToolTip(_toolTip, btnApplyRename, "Apply Rename: Update this key name across all open CSF files (checks for duplicate names)");
-            ToolTipHelper.SetToolTip(_toolTip, tvCategories, "Category Tree: Click any category prefix (e.g. GUI, MISSION, No category) to filter keys by prefix");
+            ToolTipHelper.SetToolTip(_toolTip, lblCurrentKey, LanguageManager.GetString("ToolTip.Inspector.CurrentKey", "Selected C&C CSF Label / Key Name"));
+            ToolTipHelper.SetToolTip(_toolTip, txtCurrentKeyName, LanguageManager.GetString("ToolTip.Inspector.KeyNameField", "Key Name Field: Type a new key name and click Apply Rename (or press Enter) to update across all loaded CSFs"));
+            ToolTipHelper.SetToolTip(_toolTip, btnApplyRename, LanguageManager.GetString("ToolTip.Inspector.ApplyRename", "Apply Rename: Update this key name across all open CSF files (checks for duplicate names)"));
+            ToolTipHelper.SetToolTip(_toolTip, tvCategories, LanguageManager.GetString("ToolTip.Inspector.CategoryTree", "Category Tree: Click any category prefix (e.g. GUI, MISSION, No category) to filter keys by prefix"));
 
             if (lblCurrentWav != null) lblCurrentWav.Visible = false;
             if (txtCurrentExtraWav != null) txtCurrentExtraWav.Visible = false;
@@ -8753,7 +8929,11 @@ namespace CsfStudio.UI
 
             if (string.IsNullOrWhiteSpace(newKey))
             {
-                MessageBox.Show("Key name cannot be empty or blank.", "Invalid Key Name", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.KeyNameEmptyBlank", "Key name cannot be empty or blank."),
+                    LanguageManager.GetString("Title.InvalidKeyName", "Invalid Key Name"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
                 txtCurrentKeyName.Text = oldKey;
                 return;
             }
@@ -8767,8 +8947,11 @@ namespace CsfStudio.UI
             var masterKeys = _session.BuildMasterKeyList();
             if (masterKeys.Any(k => string.Equals(k.KeyName, newKey, StringComparison.OrdinalIgnoreCase)))
             {
-                MessageBox.Show($"⚠️ Cannot rename key:\n\nA key named '{newKey}' already exists in this session!\nKey names must be unique.",
-                    "Duplicate Key Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Msg.DuplicateKeyErrorFormat", "⚠️ Cannot rename key:\n\nA key named '{0}' already exists in this session!\nKey names must be unique."), newKey),
+                    LanguageManager.GetString("Title.DuplicateKeyError", "Duplicate Key Error"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
                 txtCurrentKeyName.Text = oldKey;
                 txtCurrentKeyName.Focus();
                 txtCurrentKeyName.SelectAll();
@@ -8822,16 +9005,16 @@ namespace CsfStudio.UI
             {
                 menuUndo.Enabled = _undoManager.CanUndo;
                 menuUndo.Text = _undoManager.CanUndo
-                    ? $"↩️ Undo {_undoManager.UndoDescription} (Ctrl+Z)"
-                    : "↩️ Undo (Ctrl+Z)";
+                    ? string.Format(LanguageManager.GetString("Menu.Edit.UndoWithDescFormat", "↩️ Undo {0} (Ctrl+Z)"), _undoManager.UndoDescription)
+                    : LanguageManager.GetString("Menu.Edit.Undo", "↩️ Undo (Ctrl+Z)");
             }
 
             if (menuRedo != null)
             {
                 menuRedo.Enabled = _undoManager.CanRedo;
                 menuRedo.Text = _undoManager.CanRedo
-                    ? $"↪️ Redo {_undoManager.RedoDescription} (Ctrl+Y)"
-                    : "↪️ Redo (Ctrl+Y)";
+                    ? string.Format(LanguageManager.GetString("Menu.Edit.RedoWithDescFormat", "↪️ Redo {0} (Ctrl+Y)"), _undoManager.RedoDescription)
+                    : LanguageManager.GetString("Menu.Edit.Redo", "↪️ Redo (Ctrl+Y)");
             }
         }
 
@@ -8847,7 +9030,7 @@ namespace CsfStudio.UI
                     UpdateUIForSessionMode();
                     RebuildCategoryTreeAndGrid();
                     UpdateUndoRedoMenuItems();
-                    ShowSaveNotification($"↩️ Undid: {cmd.Description}");
+                    ShowSaveNotification(string.Format(LanguageManager.GetString("Toast.UndidFormat", "↩️ Undid: {0}"), cmd.Description));
                 }
             }
             catch (Exception ex)
@@ -8868,7 +9051,7 @@ namespace CsfStudio.UI
                     UpdateUIForSessionMode();
                     RebuildCategoryTreeAndGrid();
                     UpdateUndoRedoMenuItems();
-                    ShowSaveNotification($"↪️ Redid: {cmd.Description}");
+                    ShowSaveNotification(string.Format(LanguageManager.GetString("Toast.RedidFormat", "↪️ Redid: {0}"), cmd.Description));
                 }
             }
             catch (Exception ex)
@@ -8901,7 +9084,7 @@ namespace CsfStudio.UI
                 if (selectedKeys != null && selectedKeys.Count > 0)
                 {
                     Clipboard.SetText(string.Join(Environment.NewLine, selectedKeys));
-                    ShowSaveNotification($"📋 Copied {selectedKeys.Count} key name(s) to clipboard");
+                    ShowSaveNotification(string.Format(LanguageManager.GetString("Toast.CopiedKeyNamesFormat", "📋 Copied {0} key name(s) to clipboard"), selectedKeys.Count));
                 }
             }
         }
@@ -9118,7 +9301,15 @@ namespace CsfStudio.UI
             if (useRegex)
             {
                 try { regex = new Regex(find, matchCase ? RegexOptions.None : RegexOptions.IgnoreCase); }
-                catch (Exception ex) { MessageBox.Show($"Invalid RegEx syntax:\n{ex.Message}"); return; }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(
+                        string.Format(LanguageManager.GetString("Msg.InvalidRegexSyntaxFormat", "Invalid RegEx syntax:\n{0}"), ex.Message),
+                        LanguageManager.GetString("Title.RegexError", "RegEx Error"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    return;
+                }
             }
 
             int count = 0;
@@ -9159,7 +9350,11 @@ namespace CsfStudio.UI
             RebuildCategoryTreeAndGrid();
             if (replaceAll)
             {
-                MessageBox.Show($"Replaced {count} occurrences.", "Replace All", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Msg.ReplacedOccurrencesFormat", "Replaced {0} occurrences."), count),
+                    LanguageManager.GetString("Title.ReplaceAll", "Replace All"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
             }
         }
 
@@ -9174,18 +9369,211 @@ namespace CsfStudio.UI
             cbo.Text = currentText ?? string.Empty;
         }
 
+        private void ApplyLocalization()
+        {
+            try
+            {
+                // Menus - File
+                if (menuFile != null) menuFile.Text = LanguageManager.GetString("Menu.File", "&File");
+                if (menuNew != null) menuNew.Text = LanguageManager.GetString("Menu.File.New", "✨ &New Multi-CSF Session...");
+                if (menuOpen != null) menuOpen.Text = LanguageManager.GetString("Menu.File.Open", "📂 &Open CSF Document...");
+                if (menuOpenSession != null) menuOpenSession.Text = LanguageManager.GetString("Menu.File.OpenSession", "📂 Open &Session File...");
+                if (menuRecentSessions != null) menuRecentSessions.Text = LanguageManager.GetString("Menu.File.RecentSessions", "🕒 &Recent Sessions");
+                if (menuSave != null) menuSave.Text = LanguageManager.GetString("Menu.File.Save", "&Save All");
+                if (menuSaveSingleFile != null) menuSaveSingleFile.Text = LanguageManager.GetString("Menu.File.SaveSingleFile", "💾 Save &Current CSF File");
+                if (menuSaveAs != null) menuSaveAs.Text = LanguageManager.GetString("Menu.File.SaveAs", "Save &As...");
+                if (menuExportTxt != null) menuExportTxt.Text = LanguageManager.GetString("Menu.File.ExportTxt", "📄 &Export String Table to Plain Text...");
+                if (menuExportKeysOnly != null) menuExportKeysOnly.Text = LanguageManager.GetString("Menu.File.ExportKeysOnly", "🗝️ Export Key List &Only (Template)...");
+                if (menuImportTxt != null) menuImportTxt.Text = LanguageManager.GetString("Menu.File.ImportTxt", "📥 &Import String Table from Plain Text...");
+                if (menuExit != null) menuExit.Text = LanguageManager.GetString("Menu.File.Exit", "E&xit");
+
+                // Menus - Edit
+                if (menuEdit != null) menuEdit.Text = LanguageManager.GetString("Menu.Edit", "&Edit");
+                if (menuUndo != null) menuUndo.Text = LanguageManager.GetString("Menu.Edit.Undo", "↪️ &Undo");
+                if (menuRedo != null) menuRedo.Text = LanguageManager.GetString("Menu.Edit.Redo", "↩️ &Redo");
+                if (menuCut != null) menuCut.Text = LanguageManager.GetString("Menu.Edit.Cut", "✂️ Cut");
+                if (menuCopy != null) menuCopy.Text = LanguageManager.GetString("Menu.Edit.Copy", "📋 Copy");
+                if (menuPaste != null) menuPaste.Text = LanguageManager.GetString("Menu.Edit.Paste", "📋 Paste");
+                if (menuSelectAll != null) menuSelectAll.Text = LanguageManager.GetString("Menu.Edit.SelectAll", "☑️ Select All");
+                if (menuInvertSelection != null) menuInvertSelection.Text = LanguageManager.GetString("Menu.Edit.InvertSelection", "🔄 Invert Selection");
+                if (menuAddLabel != null) menuAddLabel.Text = LanguageManager.GetString("Menu.Edit.AddLabel", "➕ Add New Key/Label...");
+                if (menuDeleteLabel != null) menuDeleteLabel.Text = LanguageManager.GetString("Menu.Edit.DeleteLabel", "❌ Delete Selected Key(s)");
+                if (menuBatchRename != null) menuBatchRename.Text = LanguageManager.GetString("Menu.Edit.BatchRename", "✏️ &Batch Rename Keys...");
+                if (menuTrimSpaces != null) menuTrimSpaces.Text = LanguageManager.GetString("Menu.Edit.TrimSpaces", "✂️ Trim Leading/Trailing Whitespace");
+                if (menuRenameFileLabel != null) menuRenameFileLabel.Text = LanguageManager.GetString("Menu.Edit.RenameFileLabel", "✏️ Rename File Label Tag...");
+                if (menuChangeHeaderLangId != null) menuChangeHeaderLangId.Text = LanguageManager.GetString("Menu.Edit.ChangeHeaderLangId", "🌐 Change Binary Header Language ID...");
+                if (menuSetTranslationContentLang != null) menuSetTranslationContentLang.Text = LanguageManager.GetString("Menu.Edit.SetTranslationContentLang", "🌐 Set Session Content Language Override...");
+                if (menuDuplicateKey != null) menuDuplicateKey.Text = LanguageManager.GetString("Menu.Edit.DuplicateKey", "📋 Duplicate Selected Key");
+                if (menuCapitalization != null) menuCapitalization.Text = LanguageManager.GetString("Menu.Edit.Capitalization", "🔤 Capitalization & Text Case");
+                if (menuUpper != null) menuUpper.Text = LanguageManager.GetString("Menu.Edit.Upper", "UPPERCASE");
+                if (menuLower != null) menuLower.Text = LanguageManager.GetString("Menu.Edit.Lower", "lowercase");
+                if (menuTitle != null) menuTitle.Text = LanguageManager.GetString("Menu.Edit.Title", "Title Case");
+                if (menuSentence != null) menuSentence.Text = LanguageManager.GetString("Menu.Edit.Sentence", "Sentence case");
+                if (menuMoveUp != null) menuMoveUp.Text = LanguageManager.GetString("Menu.Edit.MoveUp", "⬆️ Move Key Up");
+                if (menuMoveDown != null) menuMoveDown.Text = LanguageManager.GetString("Menu.Edit.MoveDown", "⬇️ Move Key Down");
+                if (menuJumpNextEmpty != null) menuJumpNextEmpty.Text = LanguageManager.GetString("Menu.Edit.JumpNextEmpty", "⏭️ Jump to Next Empty Key");
+                if (menuJumpPrevEmpty != null) menuJumpPrevEmpty.Text = LanguageManager.GetString("Menu.Edit.JumpPrevEmpty", "⏮️ Jump to Previous Empty Key");
+                if (menuFindReplace != null) menuFindReplace.Text = LanguageManager.GetString("Menu.Edit.FindReplace", "🔍 &Find and Replace...");
+                if (menuOptions != null) menuOptions.Text = LanguageManager.GetString("Menu.Edit.Options", "⚙️ &Options...");
+
+                // Menus - Tools
+                if (menuTools != null) menuTools.Text = LanguageManager.GetString("Menu.Tools", "&Tools");
+                if (menuSyncKeys != null) menuSyncKeys.Text = LanguageManager.GetString("Menu.Tools.SyncKeys", "🔄 Sync Key Lists Across All Documents");
+                if (menuSyncAudioWavs != null) menuSyncAudioWavs.Text = LanguageManager.GetString("Menu.Tools.SyncAudioWavs", "🎵 Sync Audio Extra Values (.wav)");
+                if (menuSortBinary != null) menuSortBinary.Text = LanguageManager.GetString("Menu.Tools.SortBinary", "🔀 Sort Keys by Binary Sequence");
+                if (menuScanIni != null) menuScanIni.Text = LanguageManager.GetString("Menu.Tools.ScanIni", "🔍 &Scan INI / MAP Files for Missing Keys...");
+                if (menuConvertAnsi != null) menuConvertAnsi.Text = LanguageManager.GetString("Menu.Tools.ConvertAnsi", "🔤 &Convert Codepage / ANSI to UTF-16...");
+                if (menuClearValuesKeepKeys != null) menuClearValuesKeepKeys.Text = LanguageManager.GetString("Menu.Tools.ClearValuesKeepKeys", "🧹 Clear Text Values (Keep Key Structure)");
+
+                // Menus - Help
+                if (menuHelp != null) menuHelp.Text = LanguageManager.GetString("Menu.Help", "&Help");
+                if (menuAbout != null) menuAbout.Text = LanguageManager.GetString("Menu.Help.About", "ℹ️ &About CSF Studio...");
+                if (menuGitHubRepo != null) menuGitHubRepo.Text = LanguageManager.GetString("Menu.Help.GitHub", "🌐 GitHub Repository...");
+
+                // Main Tabs
+                if (tabMaster != null)
+                {
+                    tabMaster.Text = LanguageManager.GetString("Tab.MasterView", "Master Keys View");
+                    ToolTipHelper.SetToolTip(tabMaster, LanguageManager.GetString("ToolTip.Tab.Master", "Master String Table: View and edit all keys across loaded CSF files in a side-by-side or master grid table."));
+                }
+                if (tabKeyEditor != null)
+                {
+                    tabKeyEditor.Text = LanguageManager.GetString("Tab.PlainKeyEditor", "Plain Key View");
+                    ToolTipHelper.SetToolTip(tabKeyEditor, LanguageManager.GetString("ToolTip.Tab.KeyEditor", "Plain Keys View: Flat key list on the left with full-screen multi-language editors on the right."));
+                }
+                if (tabUnsaved != null)
+                {
+                    tabUnsaved.Text = LanguageManager.GetString("Tab.Unsaved", "Unsaved Edits");
+                    ToolTipHelper.SetToolTip(tabUnsaved, LanguageManager.GetString("ToolTip.Tab.Unsaved", "Unsaved Changes: Inspector tab listing all modified string keys waiting to be saved to disk."));
+                }
+                if (tabRecent != null)
+                {
+                    tabRecent.Text = LanguageManager.GetString("Tab.Recent", "Recent Edits");
+                    ToolTipHelper.SetToolTip(tabRecent, LanguageManager.GetString("ToolTip.Tab.Recent", "Recent Edits: History log of keys modified during the current editing session."));
+                }
+                if (tabCoverage != null)
+                {
+                    tabCoverage.Text = LanguageManager.GetString("Tab.Coverage", "Language Coverage");
+                    ToolTipHelper.SetToolTip(tabCoverage, LanguageManager.GetString("ToolTip.Tab.Coverage", "Coverage Matrix: Key completion percentage matrix across all open CSF files."));
+                }
+                if (tabBackups != null)
+                {
+                    tabBackups.Text = LanguageManager.GetString("Tab.Backups", "Snapshot Backups");
+                    ToolTipHelper.SetToolTip(tabBackups, LanguageManager.GetString("ToolTip.Tab.Backups", "Backups & History: Snapshot history of automatically created session backups (.bak) with diff inspection and restore capabilities."));
+                }
+
+                // DataGrid Column Headers
+                if (gridLabels != null && gridLabels.Columns.Count > 0)
+                {
+                    foreach (DataGridViewColumn col in gridLabels.Columns)
+                    {
+                        if (col.Name == "colIndex" || col.HeaderText == "#") col.HeaderText = LanguageManager.GetString("Grid.Column.Index", "#");
+                        else if (col.Name == "colStatus") col.HeaderText = LanguageManager.GetString("Grid.Column.Status", "Status");
+                        else if (col.Name == "colKey" || col.HeaderText == "Key" || col.HeaderText == "Key Name") col.HeaderText = LanguageManager.GetString("Grid.Column.Key", "Key");
+                        else if (col.Name == "colVal" || col.HeaderText == "String Value" || col.HeaderText == "Value") col.HeaderText = LanguageManager.GetString("Grid.Column.Value", "String Value");
+                        else if (col.Name == "colExtra" || col.HeaderText == "Extra Sound" || col.HeaderText == "Extra Value") col.HeaderText = LanguageManager.GetString("Grid.Column.ExtraValue", "Extra Sound");
+                    }
+                }
+
+                if (gridCoverage != null)
+                {
+                    if (gridCoverage.Columns.Contains("colCovKey"))
+                        gridCoverage.Columns["colCovKey"].HeaderText = LanguageManager.GetString("Grid.Column.Key", "Key Name");
+                    if (gridCoverage.Columns.Contains("colCovStatus"))
+                        gridCoverage.Columns["colCovStatus"].HeaderText = LanguageManager.GetString("Coverage.ColStatusPerFile", "Coverage Status per CSF File");
+                    if (gridCoverage.Columns.Contains("colCovPercent"))
+                        gridCoverage.Columns["colCovPercent"].HeaderText = LanguageManager.GetString("Coverage.ColCompletionPercent", "Completion %");
+                }
+
+                if (gridUnsaved != null && gridUnsaved.Columns.Count >= 4)
+                {
+                    gridUnsaved.Columns[0].HeaderText = LanguageManager.GetString("Grid.Column.Key", "Key");
+                    gridUnsaved.Columns[1].HeaderText = LanguageManager.GetString("Grid.Column.Category", "Category");
+                    gridUnsaved.Columns[2].HeaderText = LanguageManager.GetString("Grid.Column.ChangeStatus", "Change Status");
+                    gridUnsaved.Columns[3].HeaderText = LanguageManager.GetString("Grid.Column.ModTime", "Modification Time");
+                }
+
+                if (gridRecent != null && gridRecent.Columns.Count >= 3)
+                {
+                    gridRecent.Columns[0].HeaderText = LanguageManager.GetString("Grid.Column.Key", "Key Name");
+                    gridRecent.Columns[1].HeaderText = LanguageManager.GetString("Grid.Column.Category", "Category");
+                    gridRecent.Columns[2].HeaderText = LanguageManager.GetString("Grid.Column.LastModTime", "Last Modified Time");
+                }
+
+                // Toolbars & Action Buttons
+                if (lblFileFilter != null) lblFileFilter.Text = LanguageManager.GetString("Toolbar.FileView", "📄 File View:");
+                if (btnAddKeyToolbar != null) btnAddKeyToolbar.Text = LanguageManager.GetString("Toolbar.AddKey", "➕ Add Key");
+                if (btnDuplicateKeyToolbar != null) btnDuplicateKeyToolbar.Text = LanguageManager.GetString("Toolbar.DuplicateKey", "📋 Duplicate Key");
+                if (btnDeleteKeyToolbar != null) btnDeleteKeyToolbar.Text = LanguageManager.GetString("Toolbar.DeleteKey", "❌ Delete Key");
+                if (btnJumpPrevEmptyToolbar != null) btnJumpPrevEmptyToolbar.Text = LanguageManager.GetString("Toolbar.JumpPrevEmpty", "⏮️ Previous Empty Key");
+                if (btnJumpNextEmptyToolbar != null) btnJumpNextEmptyToolbar.Text = LanguageManager.GetString("Toolbar.JumpNextEmpty", "⏭️ Next Empty Key");
+                if (btnKeyFilterMode != null) btnKeyFilterMode.Text = LanguageManager.GetString("Toolbar.KeyFilterMode", "🔍 Key Filter:");
+                if (btnValFilterMode != null) btnValFilterMode.Text = LanguageManager.GetString("Toolbar.ValFilterMode", "🔍 Text Filter:");
+
+                // Status Filter Dropdown Items
+                if (cboStatusFilter != null)
+                {
+                    int selIdx = cboStatusFilter.SelectedIndex;
+                    cboStatusFilter.Items.Clear();
+                    cboStatusFilter.Items.Add(LanguageManager.GetString("StatusFilter.All", "🎯 All Statuses"));
+                    cboStatusFilter.Items.Add(LanguageManager.GetString("StatusFilter.Missing", "🔴 Missing Keys Only"));
+                    cboStatusFilter.Items.Add(LanguageManager.GetString("StatusFilter.Empty", "🟡 Empty Strings Only"));
+                    cboStatusFilter.Items.Add(LanguageManager.GetString("StatusFilter.Complete", "🟢 Complete Keys Only"));
+                    if (selIdx >= 0 && selIdx < cboStatusFilter.Items.Count) cboStatusFilter.SelectedIndex = selIdx;
+                    else if (cboStatusFilter.Items.Count > 0) cboStatusFilter.SelectedIndex = 0;
+                }
+
+                // Context Menus
+                if (_menuTranslateGridSelection != null) _menuTranslateGridSelection.Text = LanguageManager.GetString("Menu.TranslateSelection", "🌐 Translate Selection...");
+                if (_menuExportSelectedKeys != null) _menuExportSelectedKeys.Text = LanguageManager.GetString("Menu.ExportSelectedKeys", "📤 Export Selected Keys to TXT");
+                if (_menuCopyFrom != null) _menuCopyFrom.Text = LanguageManager.GetString("Menu.CopyFrom", "📋 Copy from...");
+
+                // Dynamic Tools Submenu Items
+                if (_menuTranslateMain != null) _menuTranslateMain.Text = LanguageManager.GetString("Menu.Tools.TranslateAi", "🌐 Translate / AI Localizer");
+                if (_menuDiffTool != null) _menuDiffTool.Text = LanguageManager.GetString("Menu.Tools.DiffTool", "🔀 CSF Diff & Merge...");
+                BuildTranslationSubmenus();
+
+                // Re-apply all control and menu tooltips
+                ApplyControlToolTips();
+
+                // Re-evaluate form title
+                UpdateFormTitle();
+
+                // Re-evaluate session mode & category tree root text
+                UpdateUIForSessionMode();
+                if (_session != null) RebuildCategoryTreeAndGrid();
+            }
+            catch { }
+        }
+
         private void menuOptions_Click(object sender, EventArgs e)
         {
+            string oldLang = _appConfig.UiLanguage;
             using (var dlg = new OptionsDialog(_appConfig))
             {
+                dlg.OnLanguagePreviewChanged = (langFile) =>
+                {
+                    ApplyLocalization();
+                };
+
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
                     _appConfig = dlg.Config;
                     RefreshSearchComboItems(cboSearchKey, _keyRegexMode ? _appConfig.KeySearchHistoryRegex : _appConfig.KeySearchHistoryPlain, cboSearchKey?.Text);
                     RefreshSearchComboItems(cboSearchValue, _valRegexMode ? _appConfig.ValueSearchHistoryRegex : _appConfig.ValueSearchHistoryPlain, cboSearchValue?.Text);
                     ConfigManager.SaveConfig(_appConfig);
+
+                    ApplyLocalization();
                     RefreshActiveSelectionInspector();
-                    ShowSaveNotification("Application options saved successfully.");
+                    ShowSaveNotification(LanguageManager.GetString("Toast.OptionsSaved", "Application options saved successfully."));
+                }
+                else
+                {
+                    if (!string.Equals(oldLang, _appConfig.UiLanguage, StringComparison.OrdinalIgnoreCase))
+                    {
+                        LanguageManager.LoadLanguage(oldLang);
+                        ApplyLocalization();
+                    }
                 }
             }
         }
@@ -9198,7 +9586,11 @@ namespace CsfStudio.UI
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Could not open browser link:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Msg.CouldNotOpenBrowserLinkFormat", "Could not open browser link:\n{0}"), ex.Message),
+                    LanguageManager.GetString("Title.Error", "Error"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
         }
 
@@ -9598,6 +9990,7 @@ namespace CsfStudio.UI
         private ToolStripMenuItem _menuExportSelectedKeys;
         private ToolStripMenuItem _menuCopyFrom;
         private ToolStripMenuItem _menuTranslateMain;
+        private ToolStripMenuItem _menuDiffTool;
         private List<string> _gridContextMenuSelectedKeys = new List<string>();
 
         private bool IsLocalTranslationEndpoint(string endpoint)
@@ -9654,13 +10047,13 @@ namespace CsfStudio.UI
         private void SetupGridContextMenu()
         {
             _gridContextMenu = new ContextMenuStrip();
-            _menuTranslateGridSelection = new ToolStripMenuItem("🌐 Translate Selection...");
-            _menuExportSelectedKeys = new ToolStripMenuItem("📤 Export Selected Keys to TXT");
-            _menuCopyFrom = new ToolStripMenuItem("📋 Copy from...");
+            _menuTranslateGridSelection = new ToolStripMenuItem(LanguageManager.GetString("Menu.TranslateSelection", "🌐 Translate Selection..."));
+            _menuExportSelectedKeys = new ToolStripMenuItem(LanguageManager.GetString("Menu.ExportSelectedKeys", "📤 Export Selected Keys to TXT"));
+            _menuCopyFrom = new ToolStripMenuItem(LanguageManager.GetString("Menu.CopyFrom", "📋 Copy from..."));
 
-            _gridContextMenu.Items.Add(new ToolStripMenuItem("➕ Add Key", null, (s, e) => menuAddLabel_Click(s, e)));
-            _gridContextMenu.Items.Add(new ToolStripMenuItem("📋 Duplicate Key", null, (s, e) => menuDuplicateKey_Click(s, e)));
-            _gridContextMenu.Items.Add(new ToolStripMenuItem("❌ Delete Key", null, (s, e) => menuDeleteLabel_Click(s, e)));
+            _gridContextMenu.Items.Add(new ToolStripMenuItem(LanguageManager.GetString("Toolbar.AddKey", "➕ Add Key"), null, (s, e) => menuAddLabel_Click(s, e)));
+            _gridContextMenu.Items.Add(new ToolStripMenuItem(LanguageManager.GetString("Toolbar.DuplicateKey", "📋 Duplicate Key"), null, (s, e) => menuDuplicateKey_Click(s, e)));
+            _gridContextMenu.Items.Add(new ToolStripMenuItem(LanguageManager.GetString("Toolbar.DeleteKey", "❌ Delete Key"), null, (s, e) => menuDeleteLabel_Click(s, e)));
             _gridContextMenu.Items.Add(new ToolStripSeparator());
             _gridContextMenu.Items.Add(_menuExportSelectedKeys);
             _gridContextMenu.Items.Add(_menuCopyFrom);
@@ -9689,8 +10082,8 @@ namespace CsfStudio.UI
                     {
                         var target = sDoc;
                         string title = _session.Documents.Count > 1
-                            ? $"From [{sDoc.LanguageTag}] {sDoc.FileName}"
-                            : $"Export {selKeys.Count} selected key(s)...";
+                            ? string.Format(LanguageManager.GetString("Menu.ExportFromDocFormat", "From [{0}] {1}"), sDoc.LanguageTag, sDoc.FileName)
+                            : string.Format(LanguageManager.GetString("Menu.ExportSelectedKeysCountFormat", "Export {0} selected key(s)..."), selKeys.Count);
                         var item = new ToolStripMenuItem(title, null, (s2, e2) =>
                             PerformExportForDoc(target, new List<string>(_gridContextMenuSelectedKeys)));
                         _menuExportSelectedKeys.DropDownItems.Add(item);
@@ -9705,14 +10098,16 @@ namespace CsfStudio.UI
                     foreach (var srcDoc in _session.Documents)
                     {
                         var sDoc = srcDoc;
-                        var srcItem = new ToolStripMenuItem($"From [{sDoc.LanguageTag}] {sDoc.FileName}");
+                        string srcTitle = string.Format(LanguageManager.GetString("Menu.CopyFromLangDocFormat", "From [{0}] {1}"), sDoc.LanguageTag, sDoc.FileName);
+                        var srcItem = new ToolStripMenuItem(srcTitle);
 
                         foreach (var tgtDoc in _session.Documents)
                         {
                             if (tgtDoc == sDoc) continue;
                             var tDoc = tgtDoc;
 
-                            var tgtItem = new ToolStripMenuItem($"To [{tDoc.LanguageTag}] {tDoc.FileName}", null, (s2, e2) =>
+                            string tgtTitle = string.Format(LanguageManager.GetString("Menu.CopyToLangDocFormat", "To [{0}] {1}"), tDoc.LanguageTag, tDoc.FileName);
+                            var tgtItem = new ToolStripMenuItem(tgtTitle, null, (s2, e2) =>
                             {
                                 PerformBatchCopyBetweenDocs(sDoc, tDoc, new List<string>(_gridContextMenuSelectedKeys));
                             });
@@ -9730,7 +10125,11 @@ namespace CsfStudio.UI
         {
             if (srcDoc == null || tgtDoc == null || selectedKeys == null || selectedKeys.Count == 0) return;
 
-            var batchCmd = new BatchUndoCommand($"Copy {selectedKeys.Count} key(s) from [{srcDoc.LanguageTag}] to [{tgtDoc.LanguageTag}]");
+            var batchCmd = new BatchUndoCommand(string.Format(
+                LanguageManager.GetString("Undo.CopyKeysBetweenLangs", "Copy {0} key(s) from [{1}] to [{2}]"),
+                selectedKeys.Count,
+                srcDoc.LanguageTag,
+                tgtDoc.LanguageTag));
             int copiedCount = 0;
 
             bool prevSync = _isSyncingSelection;
@@ -9786,7 +10185,7 @@ namespace CsfStudio.UI
             InvalidateMasterRowsCache();
             RebuildCategoryTreeAndGrid();
             RestoreSelectionAfterRefresh(selectedKeys);
-            ShowSaveNotification($"📋 Copied {copiedCount} key(s) from [{srcDoc.LanguageTag}] to [{tgtDoc.LanguageTag}]");
+            ShowSaveNotification(string.Format(LanguageManager.GetString("Toast.CopiedKeysBetweenLanguagesFormat", "📋 Copied {0} key(s) from [{1}] to [{2}]"), copiedCount, srcDoc.LanguageTag, tgtDoc.LanguageTag));
         }
 
         private void OpenDiffStudio(CsfDocument initialDocA = null, CsfDocument initialDocB = null)
@@ -9803,12 +10202,17 @@ namespace CsfStudio.UI
 
             if (_menuTranslateMain == null)
             {
-                _menuTranslateMain = new ToolStripMenuItem("🌐 Translate / AI Localizer");
+                _menuTranslateMain = new ToolStripMenuItem(LanguageManager.GetString("Menu.Tools.TranslateAi", "🌐 Translate / AI Localizer"));
                 menuTools.DropDownItems.Insert(0, _menuTranslateMain);
                 menuTools.DropDownItems.Insert(1, new ToolStripSeparator());
 
-                var menuDiffTool = new ToolStripMenuItem("🔀 CSF Diff & Merge...", null, (s, e) => OpenDiffStudio(null, null));
-                menuTools.DropDownItems.Insert(2, menuDiffTool);
+                _menuDiffTool = new ToolStripMenuItem(LanguageManager.GetString("Menu.Tools.DiffTool", "🔀 CSF Diff & Merge..."), null, (s, e) => OpenDiffStudio(null, null));
+                menuTools.DropDownItems.Insert(2, _menuDiffTool);
+            }
+            else
+            {
+                _menuTranslateMain.Text = LanguageManager.GetString("Menu.Tools.TranslateAi", "🌐 Translate / AI Localizer");
+                if (_menuDiffTool != null) _menuDiffTool.Text = LanguageManager.GetString("Menu.Tools.DiffTool", "🔀 CSF Diff & Merge...");
             }
 
             _menuTranslateMain.DropDownItems.Clear();
@@ -9861,7 +10265,7 @@ namespace CsfStudio.UI
             }
 
             _menuTranslateMain.DropDownItems.Add(new ToolStripSeparator());
-            var menuSettings = new ToolStripMenuItem("⚙️ Translation & AI Settings...", null, (s, e) =>
+            var menuSettings = new ToolStripMenuItem(LanguageManager.GetString("Menu.Tools.TranslationSettings", "⚙️ Translation & AI Settings..."), null, (s, e) =>
             {
                 var dlg = new CsfStudio.UI.TranslationSettingsForm();
                 if (dlg.ShowDialog(this) == DialogResult.OK)
@@ -9874,7 +10278,7 @@ namespace CsfStudio.UI
             if (_menuTranslateGridSelection != null)
             {
                 _menuTranslateGridSelection.DropDownItems.Add(new ToolStripSeparator());
-                var menuGridSettings = new ToolStripMenuItem("⚙️ Translation & AI Settings...", null, (s, e) =>
+                var menuGridSettings = new ToolStripMenuItem(LanguageManager.GetString("Menu.Tools.TranslationSettings", "⚙️ Translation & AI Settings..."), null, (s, e) =>
                 {
                     var dlg = new CsfStudio.UI.TranslationSettingsForm();
                     if (dlg.ShowDialog(this) == DialogResult.OK)
@@ -9990,47 +10394,44 @@ namespace CsfStudio.UI
         private static string GetIsoCodeFromLangTag(string langTag)
         {
             if (string.IsNullOrEmpty(langTag)) return "es";
-            string tagUpper = langTag.Trim('[', ']', ' ').ToUpperInvariant();
-            if (tagUpper == "EN" || tagUpper.Contains("ENG") || tagUpper.Contains("US") || tagUpper.Contains("UK")) return "en";
-            if (tagUpper == "ES" || tagUpper.Contains("ESP") || tagUpper.Contains("SPA")) return "es";
-            if (tagUpper == "FR" || tagUpper.Contains("FRE") || tagUpper.Contains("FRA")) return "fr";
-            if (tagUpper == "DE" || tagUpper.Contains("GER") || tagUpper.Contains("DEU")) return "de";
-            if (tagUpper == "IT" || tagUpper.Contains("ITA")) return "it";
-            if (tagUpper == "RU" || tagUpper.Contains("RUS")) return "ru";
-            if (tagUpper.StartsWith("ZH") || tagUpper.Contains("CHI") || tagUpper.Contains("CHN") || tagUpper.Contains("ZHO")) return "zh-CN";
-            if (tagUpper == "JA" || tagUpper.Contains("JPN") || tagUpper.Contains("JAP")) return "ja";
-            if (tagUpper == "KO" || tagUpper.Contains("KOR")) return "ko";
-            if (tagUpper == "PT" || tagUpper.Contains("POR") || tagUpper.Contains("BRA")) return "pt";
+            string norm = TranslationLanguageHelper.Normalize(langTag);
+            if (!string.IsNullOrEmpty(norm) && norm != "auto") return norm;
             return langTag.ToLowerInvariant();
         }
 
         private static string GetFriendlyLanguageDisplayName(string langTag)
         {
-            if (string.IsNullOrEmpty(langTag)) return "Target Language";
-            string tagUpper = langTag.Trim('[', ']', ' ').ToUpperInvariant();
-            if (tagUpper == "EN" || tagUpper.Contains("ENG") || tagUpper.Contains("US") || tagUpper.Contains("UK")) return "English (en)";
-            if (tagUpper == "ES" || tagUpper.Contains("ESP") || tagUpper.Contains("SPA")) return "Spanish (es)";
-            if (tagUpper == "FR" || tagUpper.Contains("FRE") || tagUpper.Contains("FRA")) return "French (fr)";
-            if (tagUpper == "DE" || tagUpper.Contains("GER") || tagUpper.Contains("DEU")) return "German (de)";
-            if (tagUpper == "IT" || tagUpper.Contains("ITA")) return "Italian (it)";
-            if (tagUpper == "RU" || tagUpper.Contains("RUS")) return "Russian (ru)";
-            if (tagUpper.Contains("ZH-HANS") || tagUpper.Contains("SIMPLIFIED")) return "Chinese Simplified (zh-hans)";
-            if (tagUpper.Contains("ZH-HANT") || tagUpper.Contains("TRADITIONAL")) return "Chinese Traditional (zh-hant)";
-            if (tagUpper.StartsWith("ZH") || tagUpper.Contains("CHI") || tagUpper.Contains("CHN")) return "Chinese (zh)";
-            if (tagUpper == "JA" || tagUpper.Contains("JPN") || tagUpper.Contains("JAP")) return "Japanese (ja)";
-            if (tagUpper == "KO" || tagUpper.Contains("KOR")) return "Korean (ko)";
-            if (tagUpper == "PT" || tagUpper.Contains("POR") || tagUpper.Contains("BRA")) return "Portuguese (pt)";
-
-            return langTag;
+            if (string.IsNullOrEmpty(langTag)) return LanguageManager.GetString("Language.TargetLanguage", "Target Language");
+            string norm = TranslationLanguageHelper.Normalize(langTag);
+            switch (norm.ToLowerInvariant())
+            {
+                case "en": return LanguageManager.GetString("Language.English", "English (en)");
+                case "es": return LanguageManager.GetString("Language.Spanish", "Spanish (es)");
+                case "fr": return LanguageManager.GetString("Language.French", "French (fr)");
+                case "de": return LanguageManager.GetString("Language.German", "German (de)");
+                case "it": return LanguageManager.GetString("Language.Italian", "Italian (it)");
+                case "ru": return LanguageManager.GetString("Language.Russian", "Russian (ru)");
+                case "pl": return LanguageManager.GetString("Language.Polish", "Polish (pl)");
+                case "ja": return LanguageManager.GetString("Language.Japanese", "Japanese (ja)");
+                case "ko": return LanguageManager.GetString("Language.Korean", "Korean (ko)");
+                case "zh-hant": return LanguageManager.GetString("Language.ChineseTraditional", "Chinese Traditional (zh-hant)");
+                case "zh-hans":
+                case "zh-cn":
+                case "zh": return LanguageManager.GetString("Language.ChineseSimplified", "Chinese Simplified (zh-hans)");
+                case "pt": return LanguageManager.GetString("Language.Portuguese", "Portuguese (pt)");
+                default: return langTag;
+            }
         }
 
         private string GetTranslationLanguageForDocument(CsfSessionDocument doc, bool promptForNeutral)
         {
             if (doc == null) return string.Empty;
 
+            // 1. Explicit Translation Content Language (set by user / persisted with session)
             string contentLanguage = TranslationLanguageHelper.Normalize(doc.TranslationContentLanguage);
             if (!string.IsNullOrEmpty(contentLanguage) && contentLanguage != "auto") return contentLanguage;
 
+            // 2. Physical Binary Header Language ID fallback (offset 0x14)
             string headerLanguage = TranslationLanguageHelper.GetIsoCode(doc.Document?.Language);
             if (!string.IsNullOrEmpty(headerLanguage)) return headerLanguage;
             if (!promptForNeutral) return string.Empty;
@@ -10062,11 +10463,11 @@ namespace CsfStudio.UI
                 if (dlg.ShowDialog(this) != DialogResult.OK) return;
 
                 string newLanguage = dlg.SelectedLanguage;
-                if (string.Equals(doc.TranslationContentLanguage, newLanguage, StringComparison.OrdinalIgnoreCase)) return;
-
                 doc.TranslationContentLanguage = newLanguage;
                 OnSessionUpdated();
+                RebuildCategoryTreeAndGrid();
                 SaveSessionViewStateToConfig();
+                RefreshActiveSelectionInspector();
             }
         }
 
@@ -10093,9 +10494,11 @@ namespace CsfStudio.UI
             {
                 foreach (var doc in _session.Documents)
                 {
-                    string fileName = doc.FileName ?? (string.IsNullOrEmpty(doc.FilePath) ? $"Document [{doc.LanguageTag}]" : Path.GetFileName(doc.FilePath));
-                    string currLangDisplay = GetFriendlyLanguageDisplayName(doc.TranslationContentLanguage);
-                    string itemText = $"📄 {fileName} [{doc.LanguageTag}] ({currLangDisplay})";
+                    string docFallback = string.Format(LanguageManager.GetString("MainForm.DocumentLanguageTagFormat", "Document [{0}]"), doc.LanguageTag);
+                    string fileName = doc.FileName ?? (string.IsNullOrEmpty(doc.FilePath) ? docFallback : Path.GetFileName(doc.FilePath));
+                    string effectiveIso = GetTranslationLanguageForDocument(doc, false);
+                    string currLangDisplay = GetFriendlyLanguageDisplayName(effectiveIso);
+                    string itemText = string.Format(LanguageManager.GetString("MainForm.MenuSetTranslationContentItemFormat", "📄 {0} [{1}] ({2})"), fileName, doc.LanguageTag, currLangDisplay);
 
                     var subItem = new ToolStripMenuItem(itemText);
                     CsfSessionDocument targetDoc = doc;
@@ -10117,14 +10520,21 @@ namespace CsfStudio.UI
         {
             string language = GetTranslationLanguageForDocument(doc, false);
             if (!string.IsNullOrEmpty(language)) return GetFriendlyLanguageDisplayName(language);
-            return $"Neutral ({fallbackTag}) - choose content language";
+            return string.Format(LanguageManager.GetString("MainForm.NeutralChooseLangFormat", "Neutral ({0}) - choose content language"), fallbackTag);
         }
 
         private ToolStripMenuItem CreateTranslationSubMenu(string textToTranslate, string targetIsoCode, string targetLanguageLabel, string keyName = null, CsfSessionDocument targetDoc = null, bool exists = true, string targetFileLabel = null, TextBox targetTextBox = null)
         {
-            string langDisplay = GetFriendlyLanguageDisplayName(targetLanguageLabel);
+            string effectiveIso = !string.IsNullOrEmpty(targetIsoCode)
+                ? TranslationLanguageHelper.Normalize(targetIsoCode)
+                : (targetDoc != null ? GetTranslationLanguageForDocument(targetDoc, false) : string.Empty);
+            string langDisplay = !string.IsNullOrEmpty(effectiveIso)
+                ? GetFriendlyLanguageDisplayName(effectiveIso)
+                : GetFriendlyLanguageDisplayName(targetLanguageLabel);
             string menuLabel = string.IsNullOrWhiteSpace(targetFileLabel) ? targetLanguageLabel : targetFileLabel;
-            string menuTitle = exists ? $"🌐 Translate '{menuLabel}' Entry..." : $"🌐 Translate '{menuLabel}' Entry (Key Missing)";
+            string menuTitle = exists
+                ? string.Format(LanguageManager.GetString("Menu.TranslateEntryFormat", "🌐 Translate '{0}' Entry..."), menuLabel)
+                : string.Format(LanguageManager.GetString("Menu.TranslateEntryMissingFormat", "🌐 Translate '{0}' Entry (Key Missing)"), menuLabel);
             var menuTranslate = new ToolStripMenuItem(menuTitle)
             {
                 Enabled = exists
@@ -10139,16 +10549,17 @@ namespace CsfStudio.UI
                     string iconStr = (sConfig.IsAiModel && !sConfig.DisplayName.StartsWith("[AI]", StringComparison.OrdinalIgnoreCase))
                         ? "[AI] "
                         : ((!sConfig.DisplayName.StartsWith("🌐") && !sConfig.DisplayName.StartsWith("[AI]")) ? "🌐 " : "");
-                    var itemService = new ToolStripMenuItem($"{iconStr}... into '{langDisplay}' with {sConfig.DisplayName}", null, (s, e) =>
+                    string itemText = string.Format(LanguageManager.GetString("Menu.TranslateIntoWithServiceFormat", "{0}... into '{1}' with {2}"), iconStr, langDisplay, sConfig.DisplayName);
+                    var itemService = new ToolStripMenuItem(itemText, null, (s, e) =>
                     {
                         var readyConfig = EnsureTranslationServiceConfigured(sConfig);
                         if (readyConfig == null) return;
-                        string effectiveTargetLanguage = targetDoc != null && string.IsNullOrWhiteSpace(targetIsoCode)
-                            ? GetTranslationLanguageForDocument(targetDoc, true)
-                            : TranslationLanguageHelper.Normalize(targetIsoCode);
+                        string effectiveTargetLanguage = !string.IsNullOrEmpty(effectiveIso)
+                            ? effectiveIso
+                            : (targetDoc != null ? GetTranslationLanguageForDocument(targetDoc, true) : TranslationLanguageHelper.Normalize(targetIsoCode));
                         if (!string.IsNullOrEmpty(effectiveTargetLanguage))
                         {
-                            ExecuteInstantSingleEntryTranslation(readyConfig, textToTranslate, effectiveTargetLanguage, keyName, targetLanguageLabel, targetDoc, targetTextBox);
+                            ExecuteInstantSingleEntryTranslation(readyConfig, textToTranslate, effectiveTargetLanguage, keyName, langDisplay, targetDoc, targetTextBox);
                         }
                     });
                     menuTranslate.DropDownItems.Add(itemService);
@@ -10156,7 +10567,7 @@ namespace CsfStudio.UI
 
                 menuTranslate.DropDownItems.Add(new ToolStripSeparator());
 
-                var itemBatch = new ToolStripMenuItem("📂 Batch Translate CSF Files (Dialog)...", null, (s, e) =>
+                var itemBatch = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.BatchTranslateDialog", "📂 Batch Translate CSF Files (Dialog)..."), null, (s, e) =>
                 {
                     var keysToTranslate = !string.IsNullOrEmpty(keyName)
                         ? new List<string> { keyName }
@@ -10178,7 +10589,7 @@ namespace CsfStudio.UI
                 menuTranslate.DropDownItems.Add(itemBatch);
             }
 
-            var menuSettings = new ToolStripMenuItem("⚙️ Translation & AI Settings...", null, (s, e) =>
+            var menuSettings = new ToolStripMenuItem(LanguageManager.GetString("Menu.Tools.TranslationSettings", "⚙️ Translation & AI Settings..."), null, (s, e) =>
             {
                 var dlg = new CsfStudio.UI.TranslationSettingsForm();
                 if (dlg.ShowDialog(this) == DialogResult.OK)
@@ -10189,34 +10600,51 @@ namespace CsfStudio.UI
             menuTranslate.DropDownItems.Add(menuSettings);
             menuTranslate.DropDownItems.Add(new ToolStripSeparator());
 
-            var menuWeb = new ToolStripMenuItem("🌐 Open in Web Browser...");
-            var itemGoogle = new ToolStripMenuItem("🌐 ... in Google Translate (Web)");
+            Func<string> getEffectiveTextToTranslate = () =>
+            {
+                if (!string.IsNullOrWhiteSpace(textToTranslate)) return textToTranslate;
+                if (!string.IsNullOrEmpty(keyName) && _session != null)
+                {
+                    if (_session.BaseDocument != null && _session.BaseDocument.Document != null)
+                    {
+                        var lbl = _session.BaseDocument.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, keyName, StringComparison.OrdinalIgnoreCase));
+                        if (lbl != null && lbl.Strings.Count > 0 && !string.IsNullOrWhiteSpace(lbl.Strings[0].Value))
+                        {
+                            return lbl.Strings[0].Value;
+                        }
+                    }
+                }
+                return textToTranslate;
+            };
+
+            var menuWeb = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.OpenWebBrowser", "🌐 Open in Web Browser..."));
+            var itemGoogle = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.GoogleTranslateWeb", "🌐 ... in Google Translate (Web)"));
             itemGoogle.Click += (s, e) =>
             {
                 string effectiveTargetLanguage = targetDoc != null && string.IsNullOrWhiteSpace(targetIsoCode)
                     ? GetTranslationLanguageForDocument(targetDoc, true)
                     : TranslationLanguageHelper.Normalize(targetIsoCode);
                 if (!string.IsNullOrEmpty(effectiveTargetLanguage))
-                    OpenOnlineTranslator("Google", textToTranslate, effectiveTargetLanguage);
+                    OpenOnlineTranslator("Google", getEffectiveTextToTranslate(), effectiveTargetLanguage);
             };
 
-            var itemDeepL = new ToolStripMenuItem("🌐 ... in DeepL Translator (Web)");
+            var itemDeepL = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.DeepLWeb", "🌐 ... in DeepL Translator (Web)"));
             itemDeepL.Click += (s, e) =>
             {
                 string effectiveTargetLanguage = targetDoc != null && string.IsNullOrWhiteSpace(targetIsoCode)
                     ? GetTranslationLanguageForDocument(targetDoc, true)
                     : TranslationLanguageHelper.Normalize(targetIsoCode);
                 if (!string.IsNullOrEmpty(effectiveTargetLanguage))
-                    OpenOnlineTranslator("DeepL", textToTranslate, effectiveTargetLanguage);
+                    OpenOnlineTranslator("DeepL", getEffectiveTextToTranslate(), effectiveTargetLanguage);
             };
-            var itemBing = new ToolStripMenuItem("🌐 ... in Bing / Microsoft Translator (Web)");
+            var itemBing = new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.BingWeb", "🌐 ... in Bing / Microsoft Translator (Web)"));
             itemBing.Click += (s, e) =>
             {
                 string effectiveTargetLanguage = targetDoc != null && string.IsNullOrWhiteSpace(targetIsoCode)
                     ? GetTranslationLanguageForDocument(targetDoc, true)
                     : TranslationLanguageHelper.Normalize(targetIsoCode);
                 if (!string.IsNullOrEmpty(effectiveTargetLanguage))
-                    OpenOnlineTranslator("Bing", textToTranslate, effectiveTargetLanguage);
+                    OpenOnlineTranslator("Bing", getEffectiveTextToTranslate(), effectiveTargetLanguage);
             };
 
             menuWeb.DropDownItems.Add(itemGoogle);
@@ -10310,13 +10738,19 @@ namespace CsfStudio.UI
 
             if (string.IsNullOrWhiteSpace(sourceText))
             {
-                MessageBox.Show("There is no reference text available in other open CSF files to translate this entry.", "Instant Translation", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.NoReferenceTextAvailable", "There is no reference text available in other open CSF files to translate this entry."),
+                    LanguageManager.GetString("Title.InstantTranslation", "Instant Translation"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
                 return;
             }
 
             try
             {
-                lblStatusCount.Text = $"⏳ Translating '{keyName}' from [{sourceLanguage}] to [{targetIsoCode}] via {sConfig.DisplayName}...";
+                lblStatusCount.Text = string.Format(
+                    LanguageManager.GetString("MainForm.TranslatingSingleFormat", "⏳ Translating '{0}' from [{1}] to [{2}] via {3}..."),
+                    keyName, sourceLanguage, targetIsoCode, sConfig.DisplayName);
                 Cursor = Cursors.WaitCursor;
 
                 var provider = CsfStudio.Core.Translation.TranslationProviderFactory.CreateProvider(sConfig);
@@ -10381,7 +10815,9 @@ namespace CsfStudio.UI
                         }
                     }
 
-                    lblStatusCount.Text = $"✅ Successfully translated '{keyName}' in [{targetDoc.LanguageTag}] via {sConfig.DisplayName}.";
+                    lblStatusCount.Text = string.Format(
+                        LanguageManager.GetString("MainForm.TranslatedSingleSuccessFormat", "✅ Successfully translated '{0}' in [{1}] via {2}."),
+                        keyName, targetDoc.LanguageTag, sConfig.DisplayName);
                 }
                 else
                 {
@@ -10390,15 +10826,23 @@ namespace CsfStudio.UI
                         : (result?.Items != null && result.Items.Count > 0 && !string.IsNullOrEmpty(result.Items[0].ErrorMessage)
                             ? result.Items[0].ErrorMessage
                             : "Translation service returned an empty response.");
-                    MessageBox.Show($"Translation failed:\n{err}", "Instant Translation Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    lblStatusCount.Text = "❌ Instant translation failed.";
+                    MessageBox.Show(
+                        string.Format(LanguageManager.GetString("Msg.TranslationFailedFormat", "Translation failed:\n{0}"), err),
+                        LanguageManager.GetString("Title.InstantTranslationError", "Instant Translation Error"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
+                    lblStatusCount.Text = LanguageManager.GetString("MainForm.StatusInstantTranslationFailed", "❌ Instant translation failed.");
                 }
             }
             catch (Exception ex)
             {
                 Cursor = Cursors.Default;
-                MessageBox.Show($"Error executing translation:\n{ex.Message}", "Translation Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                lblStatusCount.Text = "❌ Translation error.";
+                MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Msg.ErrorExecutingTranslationFormat", "Error executing translation:\n{0}"), ex.Message),
+                    LanguageManager.GetString("Title.TranslationError", "Translation Error"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+                lblStatusCount.Text = LanguageManager.GetString("MainForm.StatusTranslationError", "❌ Translation error.");
             }
         }
 
@@ -10406,7 +10850,11 @@ namespace CsfStudio.UI
         {
             if (string.IsNullOrWhiteSpace(text))
             {
-                MessageBox.Show("There is no text value in this entry to translate.", "Online Translation", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.NoTextValueToTranslate", "There is no text value in this entry to translate."),
+                    LanguageManager.GetString("Title.OnlineTranslation", "Online Translation"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
                 return;
             }
 
@@ -10440,7 +10888,11 @@ namespace CsfStudio.UI
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Could not open {provider} in browser:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Msg.CouldNotOpenProviderInBrowserFormat", "Could not open {0} in browser:\n{1}"), provider, ex.Message),
+                    LanguageManager.GetString("Title.Error", "Error"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
         }
 
@@ -10494,6 +10946,20 @@ namespace CsfStudio.UI
             var recent = RecentSessionsManager.FindRecentSession(_session);
             if (recent != null)
             {
+                // Restore TranslationContentLanguage on session documents if available
+                if (recent.Files != null)
+                {
+                    foreach (var doc in _session.Documents)
+                    {
+                        if (string.IsNullOrEmpty(doc.FilePath)) continue;
+                        var savedFile = recent.Files.FirstOrDefault(f => string.Equals(f.FilePath, doc.FilePath, StringComparison.OrdinalIgnoreCase));
+                        if (savedFile != null && !string.IsNullOrEmpty(savedFile.TranslationContentLanguage))
+                        {
+                            doc.TranslationContentLanguage = savedFile.TranslationContentLanguage;
+                        }
+                    }
+                }
+
                 // 1. Restore unpinned split-view target language tags
                 if (!string.IsNullOrEmpty(recent.UnpinnedLanguageTags))
                 {
@@ -10655,12 +11121,8 @@ namespace CsfStudio.UI
 
             if (keyData == Keys.Delete)
             {
-                if (isTextInputFocused)
-                {
-                    // Allow text boxes and combo boxes to perform native character deletion without triggering Delete Key dialog
-                    return false;
-                }
-                else if (menuDeleteLabel != null && menuDeleteLabel.Enabled)
+                if (isTextInputFocused) return false;
+                if (menuDeleteLabel != null && menuDeleteLabel.Enabled)
                 {
                     menuDeleteLabel_Click(this, EventArgs.Empty);
                     return true;
@@ -10668,54 +11130,30 @@ namespace CsfStudio.UI
             }
             else if (keyData == (Keys.Control | Keys.Z))
             {
-                if (focused is TextBoxBase tb && !tb.ReadOnly)
-                {
-                    if (tb.CanUndo) tb.Undo();
-                    return true;
-                }
-                else if (isTextInputFocused)
-                {
-                    return true;
-                }
-                else if (menuUndo != null && menuUndo.Enabled)
+                if (isTextInputFocused) return false;
+                if (menuUndo != null && menuUndo.Enabled)
                 {
                     menuUndo_Click(this, EventArgs.Empty);
                     return true;
                 }
             }
-            else if (keyData == (Keys.Control | Keys.Y))
+            else if (keyData == (Keys.Control | Keys.Y) || keyData == (Keys.Control | Keys.Shift | Keys.Z))
             {
-                if (isTextInputFocused)
-                {
-                    return true;
-                }
-                else if (menuRedo != null && menuRedo.Enabled)
+                if (isTextInputFocused) return false;
+                if (menuRedo != null && menuRedo.Enabled)
                 {
                     menuRedo_Click(this, EventArgs.Empty);
                     return true;
                 }
             }
+            else if (keyData == (Keys.Control | Keys.X) || keyData == (Keys.Control | Keys.V))
+            {
+                if (isTextInputFocused) return false;
+            }
             else if (keyData == (Keys.Control | Keys.C))
             {
-                if (focused is TextBoxBase tb)
-                {
-                    if (tb.SelectionLength > 0) Clipboard.SetText(tb.SelectedText);
-                    else if (!string.IsNullOrEmpty(tb.Text)) Clipboard.SetText(tb.Text);
-                    return true;
-                }
-                else if (focused is ComboBox cbo)
-                {
-                    if (cbo.SelectionLength > 0) Clipboard.SetText(cbo.SelectedText);
-                    else if (!string.IsNullOrEmpty(cbo.Text)) Clipboard.SetText(cbo.Text);
-                    return true;
-                }
-                else if (focused != null && focused.Parent is ComboBox pCbo)
-                {
-                    if (pCbo.SelectionLength > 0) Clipboard.SetText(pCbo.SelectedText);
-                    else if (!string.IsNullOrEmpty(pCbo.Text)) Clipboard.SetText(pCbo.Text);
-                    return true;
-                }
-                else if (focused is DataGridView dgv)
+                if (isTextInputFocused) return false;
+                if (focused is DataGridView dgv)
                 {
                     string val = null;
                     if (dgv.CurrentCell != null && dgv.CurrentCell.Value != null)
@@ -10739,59 +11177,6 @@ namespace CsfStudio.UI
                     if (!string.IsNullOrEmpty(val))
                     {
                         Clipboard.SetText(val);
-                        return true;
-                    }
-                }
-            }
-            else if (keyData == (Keys.Control | Keys.V))
-            {
-                if (Clipboard.ContainsText())
-                {
-                    string pasteText = Clipboard.GetText();
-
-                    if (focused is TextBoxBase tb && !tb.ReadOnly)
-                    {
-                        tb.SelectedText = pasteText;
-                        return true;
-                    }
-                    else if (focused is ComboBox cbo && cbo.DropDownStyle != ComboBoxStyle.DropDownList)
-                    {
-                        cbo.SelectedText = pasteText;
-                        return true;
-                    }
-                    else if (focused != null && focused.Parent is ComboBox pCbo && pCbo.DropDownStyle != ComboBoxStyle.DropDownList)
-                    {
-                        pCbo.SelectedText = pasteText;
-                        return true;
-                    }
-                }
-            }
-            else if (keyData == (Keys.Control | Keys.X))
-            {
-                if (focused is TextBoxBase tb && !tb.ReadOnly)
-                {
-                    if (tb.SelectionLength > 0)
-                    {
-                        Clipboard.SetText(tb.SelectedText);
-                        tb.SelectedText = string.Empty;
-                        return true;
-                    }
-                }
-                else if (focused is ComboBox cbo && cbo.DropDownStyle != ComboBoxStyle.DropDownList)
-                {
-                    if (cbo.SelectionLength > 0)
-                    {
-                        Clipboard.SetText(cbo.SelectedText);
-                        cbo.SelectedText = string.Empty;
-                        return true;
-                    }
-                }
-                else if (focused != null && focused.Parent is ComboBox pCbo && pCbo.DropDownStyle != ComboBoxStyle.DropDownList)
-                {
-                    if (pCbo.SelectionLength > 0)
-                    {
-                        Clipboard.SetText(pCbo.SelectedText);
-                        pCbo.SelectedText = string.Empty;
                         return true;
                     }
                 }

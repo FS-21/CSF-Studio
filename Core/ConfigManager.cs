@@ -15,7 +15,6 @@ namespace CsfStudio.Core
 
     public class AppConfig
     {
-        public bool SaveInAppData { get; set; } = false;
         public bool InspectorMultilineTabs { get; set; } = false;
         public int NotificationToastDurationMs { get; set; } = 5000;
         public CsfLanguage DefaultLanguage { get; set; } = CsfLanguage.EnglishUS;
@@ -24,6 +23,17 @@ namespace CsfStudio.Core
         public int MaxMultiKeyDisplayCount { get; set; } = 10;
         public string UnpinnedLanguageTags { get; set; } = string.Empty;
         public string LastSelectedKeyName { get; set; } = string.Empty;
+        public string UiLanguage { get; set; } = "en.txt";
+        public List<string> Translations { get; set; } = new List<string>
+        {
+            "en.txt",
+            "es.txt",
+            "de.txt",
+            "fr.txt",
+            "ru.txt",
+            "zh-hans.txt",
+            "zh-hant.txt"
+        };
 
         // Filter Settings
         public bool KeyRegexMode { get; set; } = false;
@@ -88,24 +98,14 @@ namespace CsfStudio.Core
 
     public static class ConfigManager
     {
-        private static readonly string AppDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CSF Studio");
-        private static readonly string AppDataIniPath = Path.Combine(AppDataDir, "settings.ini");
         private static readonly string LocalIniPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "settings.ini");
 
-        public static string GetActiveIniPath(bool saveInAppData)
+        public static string GetActiveIniPath()
         {
-            if (saveInAppData)
-            {
-                if (!Directory.Exists(AppDataDir))
-                {
-                    Directory.CreateDirectory(AppDataDir);
-                }
-                return AppDataIniPath;
-            }
             return LocalIniPath;
         }
 
-        public static string ResolveBackupDirectory(string rawPath, bool saveInAppData)
+        public static string ResolveBackupDirectory(string rawPath)
         {
             if (string.IsNullOrWhiteSpace(rawPath)) rawPath = "Backups";
             rawPath = rawPath.Trim();
@@ -115,20 +115,38 @@ namespace CsfStudio.Core
                 return rawPath;
             }
 
-            string rootDir = saveInAppData 
-                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CSF Studio") 
-                : AppDomain.CurrentDomain.BaseDirectory;
-
-            return Path.GetFullPath(Path.Combine(rootDir, rawPath));
+            return Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, rawPath));
         }
 
         public static AppConfig LoadConfig()
         {
             var config = new AppConfig();
-            string iniPath = File.Exists(LocalIniPath) ? LocalIniPath : (File.Exists(AppDataIniPath) ? AppDataIniPath : LocalIniPath);
+            string iniPath = LocalIniPath;
 
             if (!File.Exists(iniPath))
             {
+                string cultureName = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.ToLowerInvariant();
+                switch (cultureName)
+                {
+                    case "es": config.UiLanguage = "es.txt"; break;
+                    case "de": config.UiLanguage = "de.txt"; break;
+                    case "fr": config.UiLanguage = "fr.txt"; break;
+                    case "ru": config.UiLanguage = "ru.txt"; break;
+                    case "zh":
+                        if (System.Globalization.CultureInfo.CurrentUICulture.Name.IndexOf("Hant", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            System.Globalization.CultureInfo.CurrentUICulture.Name.IndexOf("TW", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                            System.Globalization.CultureInfo.CurrentUICulture.Name.IndexOf("HK", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            config.UiLanguage = "zh-hant.txt";
+                        }
+                        else
+                        {
+                            config.UiLanguage = "zh-hans.txt";
+                        }
+                        break;
+                    default: config.UiLanguage = "en.txt"; break;
+                }
+
                 SaveConfig(config);
                 return config;
             }
@@ -158,8 +176,7 @@ namespace CsfStudio.Core
                     switch (currentSection)
                     {
                         case "AppSettings":
-                            if (key == "SaveInAppData") config.SaveInAppData = ParseBool(val, false);
-                            else if (key == "InspectorMultilineTabs") config.InspectorMultilineTabs = ParseBool(val, false);
+                            if (key == "InspectorMultilineTabs") config.InspectorMultilineTabs = ParseBool(val, false);
                             else if (key == "NotificationToastDurationMs") config.NotificationToastDurationMs = int.TryParse(val, out int ntd) ? Math.Max(1000, Math.Min(30000, ntd)) : 5000;
                             else if (key == "DefaultLanguage")
                             {
@@ -171,6 +188,14 @@ namespace CsfStudio.Core
                             else if (key == "MaxMultiKeyDisplayCount" && int.TryParse(val, out int mmk)) config.MaxMultiKeyDisplayCount = Math.Max(1, Math.Min(100, mmk));
                             else if (key == "UnpinnedLanguageTags") config.UnpinnedLanguageTags = val;
                             else if (key == "LastSelectedKeyName") config.LastSelectedKeyName = val;
+                            else if (key == "UiLanguage" && !string.IsNullOrWhiteSpace(val)) config.UiLanguage = val;
+                            break;
+
+                        case "Translations":
+                            if (!string.IsNullOrWhiteSpace(val) && !config.Translations.Contains(val))
+                            {
+                                config.Translations.Add(val);
+                            }
                             break;
 
                         case "FilterSettings":
@@ -254,7 +279,7 @@ namespace CsfStudio.Core
         {
             if (config == null) return;
 
-            string targetPath = GetActiveIniPath(config.SaveInAppData);
+            string targetPath = LocalIniPath;
 
             var sb = new StringBuilder();
             sb.AppendLine("; ==============================================================================");
@@ -264,10 +289,6 @@ namespace CsfStudio.Core
             sb.AppendLine();
 
             sb.AppendLine("[AppSettings]");
-            sb.AppendLine("; Controls whether settings.ini is stored in %APPDATA%\\CSFStudio or in the local application folder.");
-            sb.AppendLine("; Type: Boolean (true / false | yes / no | 1 / 0)");
-            sb.AppendLine("; Default: true");
-            sb.AppendLine($"SaveInAppData={config.SaveInAppData.ToString().ToLowerInvariant()}");
             sb.AppendLine($"InspectorMultilineTabs={config.InspectorMultilineTabs.ToString().ToLowerInvariant()}");
             sb.AppendLine();
             sb.AppendLine("; Duration in milliseconds for on-screen notification toast messages.");
@@ -286,6 +307,18 @@ namespace CsfStudio.Core
             sb.AppendLine($"MaxMultiKeyDisplayCount={config.MaxMultiKeyDisplayCount}");
             sb.AppendLine($"UnpinnedLanguageTags={config.UnpinnedLanguageTags ?? ""}");
             sb.AppendLine($"LastSelectedKeyName={config.LastSelectedKeyName ?? ""}");
+            sb.AppendLine($"UiLanguage={config.UiLanguage ?? "en.txt"}");
+            sb.AppendLine();
+
+            sb.AppendLine("[Translations]");
+            sb.AppendLine("; UI Translation files registered for the application.");
+            if (config.Translations != null)
+            {
+                for (int i = 0; i < config.Translations.Count; i++)
+                {
+                    sb.AppendLine($"{i}={config.Translations[i]}");
+                }
+            }
             sb.AppendLine();
 
             sb.AppendLine("[FilterSettings]");
@@ -497,16 +530,6 @@ namespace CsfStudio.Core
                 if (Directory.Exists(Path.GetDirectoryName(rootProjectIni)))
                 {
                     try { File.WriteAllText(rootProjectIni, sb.ToString(), Encoding.UTF8); } catch { }
-                }
-
-                // Clean up duplicate ini if location was toggled
-                if (config.SaveInAppData && File.Exists(LocalIniPath))
-                {
-                    File.Delete(LocalIniPath);
-                }
-                else if (!config.SaveInAppData && File.Exists(AppDataIniPath))
-                {
-                    File.Delete(AppDataIniPath);
                 }
             }
             catch { }

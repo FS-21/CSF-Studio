@@ -10,7 +10,7 @@ namespace CsfStudio.Core.Translation
     {
         private static readonly HashSet<string> KnownAppSections = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            "AppSettings", "FilterSettings", "FindReplaceSettings", "BatchRenameSettings",
+            "AppSettings", "Translations", "FilterSettings", "FindReplaceSettings", "BatchRenameSettings",
             "IniScannerSettings", "UndoSettings", "WindowSettings", "BackupSettings", "PathPreferences"
         };
 
@@ -18,8 +18,7 @@ namespace CsfStudio.Core.Translation
         {
             get
             {
-                var appConfig = ConfigManager.LoadConfig();
-                return ConfigManager.GetActiveIniPath(appConfig.SaveInAppData);
+                return ConfigManager.GetActiveIniPath();
             }
         }
 

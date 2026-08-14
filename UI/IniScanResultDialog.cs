@@ -75,7 +75,7 @@ namespace CsfStudio.UI
 
         private void InitializeComponent()
         {
-            this.Text = "C&C INI Reference Scanner Results";
+            this.Text = LanguageManager.GetString("IniScan.Title", "C&C INI Reference Scanner Results");
             this.Size = new Size(980, 560);
             this.MinimumSize = new Size(820, 440);
             this.StartPosition = FormStartPosition.CenterParent;
@@ -99,8 +99,8 @@ namespace CsfStudio.UI
             var panelTop = new Panel { Dock = DockStyle.Fill, Height = 78, Padding = new Padding(10), BackColor = Color.FromArgb(245, 247, 250), Margin = new Padding(0) };
 
             string headerText = _isMultiFile
-                ? $"📄 Scanned Files ({ScannedFilesMap.Count} files): {string.Join(", ", ScannedFilesMap.Keys.Select(Path.GetFileName))}"
-                : $"📄 Scanned INI File: {(ScannedFilesMap.Keys.FirstOrDefault() ?? "N/A")}";
+                ? string.Format(LanguageManager.GetString("IniScan.HeaderMultiFilesFormat", "📄 Scanned Files ({0} files): {1}"), ScannedFilesMap.Count, string.Join(", ", ScannedFilesMap.Keys.Select(Path.GetFileName)))
+                : string.Format(LanguageManager.GetString("IniScan.HeaderSingleFileFormat", "📄 Scanned INI File: {0}"), ScannedFilesMap.Keys.FirstOrDefault() ?? "N/A");
 
             lblFilePath = new Label 
             { 
@@ -113,7 +113,7 @@ namespace CsfStudio.UI
 
             lblSummary = new Label 
             { 
-                Text = "Calculating...",
+                Text = LanguageManager.GetString("IniScan.Calculating", "Calculating..."),
                 Location = new Point(10, 30), 
                 AutoSize = true, 
                 Font = new Font("Segoe UI", 9F, FontStyle.Regular),
@@ -122,7 +122,7 @@ namespace CsfStudio.UI
 
             chkShowExisting = new CheckBox
             {
-                Text = "☑ Show Existing Keys (🟢 EXISTS) & Inline Literals (🔹 NOSTR)",
+                Text = LanguageManager.GetString("IniScan.ShowExisting", "☑ Show Existing Keys (🟢 EXISTS) & Inline Literals (🔹 NOSTR)"),
                 Location = new Point(10, 52),
                 AutoSize = true,
                 Checked = false, // Hidden by default
@@ -158,20 +158,20 @@ namespace CsfStudio.UI
 
             if (_isMultiFile)
             {
-                var colFile = new DataGridViewTextBoxColumn { HeaderText = "INI File", ReadOnly = true, FillWeight = 20 };
-                var colSection = new DataGridViewTextBoxColumn { HeaderText = "INI Section", ReadOnly = true, FillWeight = 20 };
-                var colProperty = new DataGridViewTextBoxColumn { HeaderText = "INI Property", ReadOnly = true, FillWeight = 18 };
-                var colKey = new DataGridViewTextBoxColumn { HeaderText = "Referenced Key", ReadOnly = true, FillWeight = 27, DefaultCellStyle = boldStyle };
-                var colStatus = new DataGridViewTextBoxColumn { HeaderText = "CSF Status", ReadOnly = true, FillWeight = 15 };
+                var colFile = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("IniScan.ColFile", "INI File"), ReadOnly = true, FillWeight = 20 };
+                var colSection = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("IniScan.ColSection", "INI Section"), ReadOnly = true, FillWeight = 20 };
+                var colProperty = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("IniScan.ColProperty", "INI Property"), ReadOnly = true, FillWeight = 18 };
+                var colKey = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("IniScan.ColRefKey", "Referenced Key"), ReadOnly = true, FillWeight = 27, DefaultCellStyle = boldStyle };
+                var colStatus = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Grid.Column.Status", "CSF Status"), ReadOnly = true, FillWeight = 15 };
 
                 grid.Columns.AddRange(colFile, colSection, colProperty, colKey, colStatus);
             }
             else
             {
-                var colSection = new DataGridViewTextBoxColumn { HeaderText = "INI Section", ReadOnly = true, FillWeight = 25 };
-                var colProperty = new DataGridViewTextBoxColumn { HeaderText = "INI Property", ReadOnly = true, FillWeight = 20 };
-                var colKey = new DataGridViewTextBoxColumn { HeaderText = "Referenced Key", ReadOnly = true, FillWeight = 35, DefaultCellStyle = boldStyle };
-                var colStatus = new DataGridViewTextBoxColumn { HeaderText = "CSF Status", ReadOnly = true, FillWeight = 20 };
+                var colSection = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("IniScan.ColSection", "INI Section"), ReadOnly = true, FillWeight = 25 };
+                var colProperty = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("IniScan.ColProperty", "INI Property"), ReadOnly = true, FillWeight = 20 };
+                var colKey = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("IniScan.ColRefKey", "Referenced Key"), ReadOnly = true, FillWeight = 35, DefaultCellStyle = boldStyle };
+                var colStatus = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Grid.Column.Status", "CSF Status"), ReadOnly = true, FillWeight = 20 };
 
                 grid.Columns.AddRange(colSection, colProperty, colKey, colStatus);
             }
@@ -183,7 +183,7 @@ namespace CsfStudio.UI
                     var row = grid.Rows[e.RowIndex];
                     if (row.Tag is IniScanResult item && !string.IsNullOrEmpty(item.FullIniPath))
                     {
-                        e.ToolTipText = $"Full Path: {item.FullIniPath}";
+                        e.ToolTipText = string.Format(LanguageManager.GetString("IniScan.FullPathFormat", "Full Path: {0}"), item.FullIniPath);
                     }
                 }
             };
@@ -204,7 +204,7 @@ namespace CsfStudio.UI
 
             btnClose = new Button 
             { 
-                Text = "Close", 
+                Text = LanguageManager.GetString("Button.Close", "Close"), 
                 Size = new Size(90, 32),
                 Margin = new Padding(6, 0, 6, 0),
                 UseVisualStyleBackColor = true
@@ -217,7 +217,7 @@ namespace CsfStudio.UI
 
             btnCreateAllMissing = new Button 
             { 
-                Text = "⚡ Add ALL Missing Keys to CSF", 
+                Text = LanguageManager.GetString("IniScan.AddAllMissing", "⚡ Add ALL Missing Keys to CSF"), 
                 Size = new Size(270, 32),
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 Margin = new Padding(6, 0, 6, 0),
@@ -227,7 +227,7 @@ namespace CsfStudio.UI
 
             btnCreateMissing = new Button 
             { 
-                Text = "⚡ Add Selected Keys...", 
+                Text = LanguageManager.GetString("IniScan.AddSelected", "⚡ Add Selected Keys..."), 
                 Size = new Size(185, 32),
                 Font = new Font("Segoe UI", 9F, FontStyle.Regular),
                 Margin = new Padding(6, 0, 6, 0),
@@ -237,7 +237,7 @@ namespace CsfStudio.UI
 
             btnExportResults = new Button 
             { 
-                Text = "📋 Export Results...", 
+                Text = LanguageManager.GetString("IniScan.ExportResults", "📋 Export Results..."), 
                 Size = new Size(170, 32),
                 Font = new Font("Segoe UI", 9F, FontStyle.Regular),
                 Margin = new Padding(6, 0, 6, 0),
@@ -260,10 +260,10 @@ namespace CsfStudio.UI
 
             this.Controls.Add(mainTable);
 
-            ToolTipHelper.SetToolTip(btnExportResults, "Export Results: Export missing CSF key names to a plain text file or CSV spreadsheet using standard app exporters.");
-            ToolTipHelper.SetToolTip(btnCreateAllMissing, "Add ALL Missing Keys: Automatically add ALL unique missing string key slots found in scan into open CSF files.");
-            ToolTipHelper.SetToolTip(btnCreateMissing, "Add Selected Keys: Automatically add only selected missing string key slots into open CSF files.");
-            ToolTipHelper.SetToolTip(btnClose, "Close window.");
+            ToolTipHelper.SetToolTip(btnExportResults, LanguageManager.GetString("ToolTip.IniScan.ExportResults", "Export Results: Export missing CSF key names to a plain text file or CSV spreadsheet using standard app exporters."));
+            ToolTipHelper.SetToolTip(btnCreateAllMissing, LanguageManager.GetString("ToolTip.IniScan.AddAllMissing", "Add ALL Missing Keys: Automatically add ALL unique missing string key slots found in scan into open CSF files."));
+            ToolTipHelper.SetToolTip(btnCreateMissing, LanguageManager.GetString("ToolTip.IniScan.AddSelected", "Add Selected Keys: Automatically add only selected missing string key slots into open CSF files."));
+            ToolTipHelper.SetToolTip(btnClose, LanguageManager.GetString("ToolTip.IniScan.Close", "Close window."));
         }
 
         private void UpdateButtonStates()
@@ -303,17 +303,17 @@ namespace CsfStudio.UI
             else
             {
                 btnCreateAllMissing.Text = isMultiCsf
-                    ? "⚡ Add ALL Missing Keys to All CSFs"
-                    : "⚡ Add ALL Missing Keys to CSF";
+                    ? LanguageManager.GetString("IniScan.AddAllMultiCsf", "⚡ Add ALL Missing Keys to All CSFs")
+                    : LanguageManager.GetString("IniScan.AddAllSingleCsf", "⚡ Add ALL Missing Keys to CSF");
             }
 
             if (hasSelectedMissing)
             {
-                btnCreateMissing.Text = $"⚡ Add Selected ({distinctSelectedKeys.Count:N0})";
+                btnCreateMissing.Text = string.Format(LanguageManager.GetString("IniScan.AddSelectedCountFormat", "⚡ Add Selected ({0:N0})"), distinctSelectedKeys.Count);
             }
             else
             {
-                btnCreateMissing.Text = "⚡ Add Selected Keys...";
+                btnCreateMissing.Text = LanguageManager.GetString("IniScan.AddSelectedDefault", "⚡ Add Selected Keys...");
             }
         }
 
@@ -339,7 +339,9 @@ namespace CsfStudio.UI
             int nostrCount = _allResults.Count(r => r.IsNostrInline);
             int existCount = _allResults.Count(r => r.ExistsInCsf && !r.IsNostrInline);
 
-            lblSummary.Text = $"Total INI references: {_allResults.Count:N0}   |   🟢 Exist in CSF: {existCount:N0}   |   🔹 Inline NOSTR: {nostrCount:N0}   |   🔴 Missing in CSF: {missingCount:N0}";
+            lblSummary.Text = string.Format(
+                LanguageManager.GetString("IniScan.SummaryFormat", "Total INI references: {0:N0}   |   🟢 Exist in CSF: {1:N0}   |   🔹 Inline NOSTR: {2:N0}   |   🔴 Missing in CSF: {3:N0}"),
+                _allResults.Count, existCount, nostrCount, missingCount);
 
             bool showAll = chkShowExisting != null && chkShowExisting.Checked;
 
@@ -351,7 +353,11 @@ namespace CsfStudio.UI
 
                 if (!showAll && !isMissing) continue;
 
-                string statusText = item.IsNostrInline ? "🟢 INLINE (NOSTR)" : (item.ExistsInCsf ? "🟢 EXISTS" : "🔴 MISSING");
+                string statusText = item.IsNostrInline
+                    ? LanguageManager.GetString("IniScan.StatusInlineNostr", "🟢 INLINE (NOSTR)")
+                    : (item.ExistsInCsf
+                        ? LanguageManager.GetString("IniScan.StatusExists", "🟢 EXISTS")
+                        : LanguageManager.GetString("IniScan.StatusMissing", "🔴 MISSING"));
 
                 int rowIndex;
                 if (_isMultiFile)
@@ -406,7 +412,11 @@ namespace CsfStudio.UI
 
                 if (targetKeys.Count == 0)
                 {
-                    MessageBox.Show("No missing keys found to add.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(
+                        LanguageManager.GetString("Msg.NoMissingKeysToAdd", "No missing keys found to add."),
+                        LanguageManager.GetString("Title.Information", "Information"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
                     return;
                 }
             }
@@ -429,7 +439,11 @@ namespace CsfStudio.UI
 
                 if (targetKeys.Count == 0)
                 {
-                    MessageBox.Show("Please select at least one missing key row in the table to add.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(
+                        LanguageManager.GetString("Msg.SelectMissingKeyRowToAdd", "Please select at least one missing key row in the table to add."),
+                        LanguageManager.GetString("Title.NoSelection", "No Selection"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
                     return;
                 }
             }
@@ -437,14 +451,17 @@ namespace CsfStudio.UI
             int docCount = _session.Documents.Count;
             int uniqueCount = targetKeys.Count;
 
-            string modeTitle = isAllMode ? "Confirm Add ALL Missing Keys" : "Confirm Add Selected Keys";
+            string modeTitle = isAllMode
+                ? LanguageManager.GetString("Title.ConfirmAddAllMissingKeys", "Confirm Add ALL Missing Keys")
+                : LanguageManager.GetString("Title.ConfirmAddSelectedKeys", "Confirm Add Selected Keys");
+
             string countDetails = (totalRefsCount > uniqueCount)
-                ? $"{totalRefsCount:N0} scanned INI reference(s) ({uniqueCount:N0} unique key names)"
-                : $"{uniqueCount:N0} unique missing key name(s)";
+                ? string.Format(LanguageManager.GetString("IniScan.ScannedRefsDetailsFormat", "{0:N0} scanned INI reference(s) ({1:N0} unique key names)"), totalRefsCount, uniqueCount)
+                : string.Format(LanguageManager.GetString("IniScan.UniqueMissingKeysDetailsFormat", "{0:N0} unique missing key name(s)"), uniqueCount);
 
             string confirmMsg = docCount > 1
-                ? $"Do you want to add {countDetails} across all {docCount} open CSF files?\n\n(Only unique missing keys that do not already exist will be created)."
-                : $"Do you want to add {countDetails} to the open CSF file?\n\n(Only unique missing keys that do not already exist will be created).";
+                ? string.Format(LanguageManager.GetString("Msg.ConfirmAddKeysMultiDocFormat", "Do you want to add {0} across all {1} open CSF files?\n\n(Only unique missing keys that do not already exist will be created)."), countDetails, docCount)
+                : string.Format(LanguageManager.GetString("Msg.ConfirmAddKeysSingleDocFormat", "Do you want to add {0} to the open CSF file?\n\n(Only unique missing keys that do not already exist will be created)."), countDetails);
 
             var dialogResult = MessageBox.Show(confirmMsg, modeTitle, MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (dialogResult != DialogResult.Yes) return;
@@ -489,10 +506,14 @@ namespace CsfStudio.UI
             }
 
             string successMsg = docCount > 1
-                ? $"Successfully added {uniqueCount:N0} unique key(s) across all {docCount} open CSF files."
-                : $"Successfully added {uniqueCount:N0} unique key(s) to the open CSF file.";
+                ? string.Format(LanguageManager.GetString("Msg.KeysAddedMultiDocFormat", "Successfully added {0:N0} unique key(s) across all {1} open CSF files."), uniqueCount, docCount)
+                : string.Format(LanguageManager.GetString("Msg.KeysAddedSingleDocFormat", "Successfully added {0:N0} unique key(s) to the open CSF file."), uniqueCount);
 
-            MessageBox.Show(successMsg, "Keys Added", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(
+                successMsg,
+                LanguageManager.GetString("Title.KeysAdded", "Keys Added"),
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
             PopulateAllData();
         }
 
@@ -518,20 +539,28 @@ namespace CsfStudio.UI
             var distinctSelectedKeys = selectedMissingItems.Select(r => r.KeyName).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (distinctSelectedKeys.Count == 0)
             {
-                MessageBox.Show("No missing keys found to export.", "No Data", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.NoMissingKeysToExport", "No missing keys found to export."),
+                    LanguageManager.GetString("Title.NoData", "No Data"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
                 return;
             }
 
             using (var sfd = new SaveFileDialog())
             {
-                sfd.Filter = "Text File (*.txt)|*.txt";
-                sfd.Title = "Export Missing CSF Keys List";
+                sfd.Filter = LanguageManager.GetString("Filter.TxtFilesOnly", "Text File (*.txt)|*.txt");
+                sfd.Title = LanguageManager.GetString("IniScan.ExportTitle", "Export Missing CSF Keys List");
                 sfd.FileName = "Missing_CSF_Keys.txt";
 
                 if (sfd.ShowDialog() == DialogResult.OK)
                 {
                     CsfTxtExporterImporter.ExportKeyStructureToTxt(distinctSelectedKeys, sfd.FileName);
-                    MessageBox.Show($"Exported {distinctSelectedKeys.Count} missing CSF key(s) to '{Path.GetFileName(sfd.FileName)}'.", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(
+                        string.Format(LanguageManager.GetString("Msg.ExportedMissingKeysFormat", "Exported {0} missing CSF key(s) to '{1}'."), distinctSelectedKeys.Count, Path.GetFileName(sfd.FileName)),
+                        LanguageManager.GetString("Title.ExportComplete", "Export Complete"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
                 }
             }
         }

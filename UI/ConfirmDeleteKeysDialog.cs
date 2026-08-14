@@ -22,7 +22,7 @@ namespace CsfStudio.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Confirm Key Deletion";
+            this.Text = LanguageManager.GetString("DeleteDialog.Title", "Confirm Key Deletion");
             this.Size = new Size(860, 540);
             this.MinimumSize = new Size(680, 400);
             this.StartPosition = FormStartPosition.CenterParent;
@@ -38,7 +38,7 @@ namespace CsfStudio.UI
 
             lblMessage = new Label
             {
-                Text = "⚠️ Are you sure you want to permanently delete the following key(s) from ALL open CSF files?",
+                Text = LanguageManager.GetString("DeleteDialog.WarnMsg", "⚠️ Are you sure you want to permanently delete the following key(s) from ALL open CSF files?"),
                 Dock = DockStyle.Fill,
                 Font = new Font(FontFamily.GenericSansSerif, 9f, FontStyle.Bold),
                 ForeColor = Color.DarkRed,
@@ -67,19 +67,19 @@ namespace CsfStudio.UI
 
             var colKey = new DataGridViewTextBoxColumn
             {
-                HeaderText = "Key Name",
+                HeaderText = LanguageManager.GetString("Grid.Column.Key", "Key Name"),
                 Width = 220,
                 ReadOnly = true
             };
             var colLang = new DataGridViewTextBoxColumn
             {
-                HeaderText = "Label",
+                HeaderText = LanguageManager.GetString("DeleteDialog.ColLabel", "Label"),
                 Width = 140,
                 ReadOnly = true
             };
             var colVal = new DataGridViewTextBoxColumn
             {
-                HeaderText = "Full Entry Value to be Deleted",
+                HeaderText = LanguageManager.GetString("DeleteDialog.ColVal", "Full Entry Value to be Deleted"),
                 AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill,
                 ReadOnly = true
             };
@@ -96,7 +96,7 @@ namespace CsfStudio.UI
 
             btnDelete = new Button
             {
-                Text = "🗑️ Permanently Delete Key(s)",
+                Text = LanguageManager.GetString("DeleteDialog.BtnDelete", "🗑️ Permanently Delete Key(s)"),
                 DialogResult = DialogResult.OK,
                 Size = new Size(210, 33),
                 Font = new Font(FontFamily.GenericSansSerif, 9f, FontStyle.Bold),
@@ -106,7 +106,7 @@ namespace CsfStudio.UI
 
             btnCancel = new Button
             {
-                Text = "Cancel",
+                Text = LanguageManager.GetString("Button.Cancel", "Cancel"),
                 DialogResult = DialogResult.Cancel,
                 Size = new Size(100, 33)
             };
@@ -133,10 +133,13 @@ namespace CsfStudio.UI
         {
             if (keysToDelete == null || keysToDelete.Count == 0 || session == null) return;
 
-            lblMessage.Text = $"⚠️ Are you sure you want to delete {keysToDelete.Count} key(s) from ALL open CSF files?";
+            lblMessage.Text = string.Format(
+                LanguageManager.GetString("DeleteDialog.WarnMsgCount", "⚠️ Are you sure you want to delete {0} key(s) from ALL open CSF files?"),
+                keysToDelete.Count);
 
             var documents = session.Documents;
             var baseDoc = session.BaseDocument ?? documents.FirstOrDefault();
+            string emptyPlaceholder = LanguageManager.GetString("Grid.EmptyMissing", "(Empty / Missing)");
 
             for (int k = 0; k < keysToDelete.Count; k++)
             {
@@ -148,11 +151,11 @@ namespace CsfStudio.UI
                 {
                     string tag = baseDoc.LanguageTag;
                     string val = row.ValuesPerLanguage.TryGetValue(tag, out var v) ? v.Value : string.Empty;
-                    string displayVal = string.IsNullOrEmpty(val) ? "(Empty / Missing)" : val;
+                    string displayVal = string.IsNullOrEmpty(val) ? emptyPlaceholder : val;
 
                     int idx = gridKeys.Rows.Add(
                         $"🔑 {row.KeyName}",
-                        $"📌 Base ({tag})",
+                        string.Format(LanguageManager.GetString("DeleteDialog.BaseTagFormat", "📌 Base ({0})"), tag),
                         displayVal
                     );
 
@@ -166,7 +169,7 @@ namespace CsfStudio.UI
                 {
                     string tag = doc.LanguageTag;
                     string val = row.ValuesPerLanguage.TryGetValue(tag, out var v) ? v.Value : string.Empty;
-                    string displayVal = string.IsNullOrEmpty(val) ? "(Empty / Missing)" : val;
+                    string displayVal = string.IsNullOrEmpty(val) ? emptyPlaceholder : val;
 
                     int idx = gridKeys.Rows.Add(
                         firstLine ? $"🔑 {row.KeyName}" : string.Empty,

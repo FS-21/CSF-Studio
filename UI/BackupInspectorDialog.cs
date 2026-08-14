@@ -31,13 +31,13 @@ namespace CsfStudio.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Timestamped Backup (.bak) History & Inspector";
+            this.Text = LanguageManager.GetString("BackupInspector.Title", "Timestamped Backup (.bak) History & Inspector");
             this.Size = new Size(880, 500);
             this.StartPosition = FormStartPosition.CenterParent;
             this.ShowIcon = false;
 
             var panelTop = new Panel { Dock = DockStyle.Top, Height = 50, Padding = new Padding(10) };
-            var lblSelect = new Label { Text = "Select Backup File:", Location = new Point(10, 15), AutoSize = true };
+            var lblSelect = new Label { Text = LanguageManager.GetString("BackupInspector.SelectBackup", "Select Backup File:"), Location = new Point(10, 15), AutoSize = true };
             cboBackupFiles = new ComboBox { Location = new Point(130, 12), Width = 410, DropDownStyle = ComboBoxStyle.DropDownList };
             cboBackupFiles.SelectedIndexChanged += CboBackupFiles_SelectedIndexChanged;
 
@@ -59,18 +59,18 @@ namespace CsfStudio.UI
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
             };
 
-            var colCheck = new DataGridViewCheckBoxColumn { HeaderText = "Restore", Width = 70 };
-            var colKey = new DataGridViewTextBoxColumn { HeaderText = "Label (Key)", ReadOnly = true, Width = 180 };
-            var colStatus = new DataGridViewTextBoxColumn { HeaderText = "Difference", ReadOnly = true, Width = 120 };
-            var colCurrent = new DataGridViewTextBoxColumn { HeaderText = "Current Value", ReadOnly = true };
-            var colBackup = new DataGridViewTextBoxColumn { HeaderText = "Backup (.bak) Value", ReadOnly = true };
+            var colCheck = new DataGridViewCheckBoxColumn { HeaderText = LanguageManager.GetString("BackupInspector.ColRestore", "Restore"), Width = 70 };
+            var colKey = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Grid.Column.Key", "Key Name"), ReadOnly = true, Width = 180 };
+            var colStatus = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Grid.Column.Status", "Status"), ReadOnly = true, Width = 120 };
+            var colCurrent = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Backups.ColCurrentText", "Current Text"), ReadOnly = true };
+            var colBackup = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Backups.ColOldText", "Old Text"), ReadOnly = true };
 
             gridDiff.Columns.AddRange(colCheck, colKey, colStatus, colCurrent, colBackup);
 
             var panelBottom = new Panel { Dock = DockStyle.Bottom, Height = 50, Padding = new Padding(10) };
-            btnRestoreSelected = new Button { Text = "Restore Selected Keys", Location = new Point(440, 10), Size = new Size(200, 30) };
-            btnRestoreAll = new Button { Text = "Restore Full File", Location = new Point(650, 10), Size = new Size(150, 30) };
-            btnClose = new Button { Text = "Close", DialogResult = DialogResult.Cancel, Location = new Point(810, 10), Size = new Size(50, 30) };
+            btnRestoreSelected = new Button { Text = LanguageManager.GetString("BackupInspector.BtnRestoreSelected", "Restore Selected Keys"), Location = new Point(440, 10), Size = new Size(200, 30) };
+            btnRestoreAll = new Button { Text = LanguageManager.GetString("BackupInspector.BtnRestoreAll", "Restore Full File"), Location = new Point(650, 10), Size = new Size(150, 30) };
+            btnClose = new Button { Text = LanguageManager.GetString("Button.Close", "Close"), DialogResult = DialogResult.Cancel, Location = new Point(810, 10), Size = new Size(50, 30) };
 
             btnRestoreSelected.Click += BtnRestoreSelected_Click;
             btnRestoreAll.Click += BtnRestoreAll_Click;
@@ -98,7 +98,7 @@ namespace CsfStudio.UI
                     .ToList();
 
                 var cfg = ConfigManager.LoadConfig();
-                string backupsFolder = BackupManager.GetBackupDirectory(_currentFilePath, cfg.BackupDirectoryPath, cfg.SaveInAppData);
+                string backupsFolder = BackupManager.GetBackupDirectory(_currentFilePath, cfg.BackupDirectoryPath);
                 if (!string.IsNullOrEmpty(backupsFolder) && Directory.Exists(backupsFolder))
                 {
                     files.AddRange(Directory.GetFiles(backupsFolder, "*", SearchOption.AllDirectories)
@@ -118,7 +118,7 @@ namespace CsfStudio.UI
             }
             else
             {
-                lblBackupInfo.Text = "No backups found for this file.";
+                lblBackupInfo.Text = LanguageManager.GetString("BackupInspector.NoBackupsFound", "No backups found for this file.");
             }
         }
 
@@ -130,12 +130,16 @@ namespace CsfStudio.UI
             try
             {
                 _selectedBackupDoc = CsfFileHandler.Load(path);
-                lblBackupInfo.Text = $"Backup Date: {File.GetLastWriteTime(path):yyyy-MM-dd HH:mm:ss}";
+                lblBackupInfo.Text = string.Format(LanguageManager.GetString("BackupInspector.BackupDate", "Backup Date: {0}"), File.GetLastWriteTime(path).ToString("yyyy-MM-dd HH:mm:ss"));
                 PopulateGrid();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error reading backup file:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Msg.ErrorReadingBackup", "Error reading backup file:\n{0}"), ex.Message),
+                    LanguageManager.GetString("Msg.ErrorTitle", "Error"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
         }
 
@@ -150,6 +154,11 @@ namespace CsfStudio.UI
             var allKeys = new HashSet<string>(currMap.Keys, StringComparer.OrdinalIgnoreCase);
             allKeys.UnionWith(bakMap.Keys);
 
+            string statusDeleted = LanguageManager.GetString("BackupInspector.StatusDeleted", "🔴 Deleted (in .bak)");
+            string statusNew = LanguageManager.GetString("BackupInspector.StatusNew", "🆕 New (not in .bak)");
+            string statusEdited = LanguageManager.GetString("BackupInspector.StatusEdited", "⚡ Value Edited");
+            string missingStr = LanguageManager.GetString("Grid.Status.Missing", "Missing");
+
             foreach (var key in allKeys.OrderBy(k => k))
             {
                 bool inCurr = currMap.TryGetValue(key, out var currLbl);
@@ -161,16 +170,16 @@ namespace CsfStudio.UI
                 if (currVal == bakVal) continue;
 
                 string status;
-                if (!inCurr && inBak) status = "🔴 Deleted (in .bak)";
-                else if (inCurr && !inBak) status = "🆕 New (not in .bak)";
-                else status = "⚡ Value Edited";
+                if (!inCurr && inBak) status = statusDeleted;
+                else if (inCurr && !inBak) status = statusNew;
+                else status = statusEdited;
 
                 int idx = gridDiff.Rows.Add(
                     true,
                     key,
                     status,
-                    currVal ?? "(Missing)",
-                    bakVal ?? "(Missing)"
+                    currVal ?? $"({missingStr})",
+                    bakVal ?? $"({missingStr})"
                 );
 
                 gridDiff.Rows[idx].Tag = key;
@@ -206,7 +215,11 @@ namespace CsfStudio.UI
                 }
             }
 
-            MessageBox.Show($"Restored {restored} keys from backup.", "Restoration Completed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(
+                string.Format(LanguageManager.GetString("Msg.RestoredKeysCount", "Restored {0} keys from backup."), restored),
+                LanguageManager.GetString("Msg.RestorationCompleteTitle", "Restoration Completed"),
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
             this.DialogResult = DialogResult.OK;
             Close();
         }
@@ -215,8 +228,11 @@ namespace CsfStudio.UI
         {
             if (_selectedBackupDoc == null) return;
 
-            if (MessageBox.Show("Are you sure you want to replace the entire active file with this backup?",
-                "Confirm Full Restore", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+            if (MessageBox.Show(
+                LanguageManager.GetString("Msg.ConfirmReplaceFullFile", "Are you sure you want to replace the entire active file with this backup?"),
+                LanguageManager.GetString("Msg.ConfirmRestoreTitle", "Confirm Full Restore"),
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Warning) == DialogResult.Yes)
             {
                 _currentDoc.Labels.Clear();
                 foreach (var lbl in _selectedBackupDoc.Labels)
@@ -226,7 +242,11 @@ namespace CsfStudio.UI
                 _currentDoc.Version = _selectedBackupDoc.Version;
                 _currentDoc.Language = _selectedBackupDoc.Language;
 
-                MessageBox.Show("File restored completely.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.FileRestoredSuccess", "File restored completely."),
+                    LanguageManager.GetString("Msg.SuccessTitle", "Success"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
                 this.DialogResult = DialogResult.OK;
                 Close();
             }

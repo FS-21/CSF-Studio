@@ -75,7 +75,7 @@ namespace CsfStudio.UI
 
         private void InitializeComponent()
         {
-            this.Text = "🔤 Convert CSF Text Encoding (ANSI / Codepage to Unicode)";
+            this.Text = LanguageManager.GetString("ConvertAnsi.Title", "🔤 Convert CSF Text Encoding (ANSI / Codepage to Unicode)");
             this.Size = new Size(720, 560);
             this.StartPosition = FormStartPosition.CenterParent;
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -104,8 +104,7 @@ namespace CsfStudio.UI
 
             var lblWarnText = new Label
             {
-                Text = "ATTENTION: This operation re-encodes raw ANSI / multibyte text bytes into standard Unicode strings for all selected CSF files.\n" +
-                       "Supports Russian, Chinese, Japanese, Korean, European, and all system encodings. Affected files will be marked as modified (*).",
+                Text = LanguageManager.GetString("ConvertAnsi.WarnText", "ATTENTION: This operation re-encodes raw ANSI / multibyte text bytes into standard Unicode strings for all selected CSF files.\nSupports Russian, Chinese, Japanese, Korean, European, and all system encodings. Affected files will be marked as modified (*)."),
                 Location = new Point(45, 8),
                 Size = new Size(625, 42),
                 ForeColor = Color.FromArgb(120, 70, 0)
@@ -115,17 +114,17 @@ namespace CsfStudio.UI
             panelWarning.Controls.Add(lblWarnText);
 
             // --- SOURCE CODEPAGE ---
-            var lblCodepage = new Label { Text = "Source Codepage / Encoding:", Location = new Point(12, 78), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            var lblCodepage = new Label { Text = LanguageManager.GetString("ConvertAnsi.SourceCodepage", "Source Codepage / Encoding:"), Location = new Point(12, 78), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
             
             txtSearchCodepage = new TextBox
             {
                 Location = new Point(12, 98),
                 Size = new Size(130, 22)
             };
-            ToolTipHelper.SetToolTip(txtSearchCodepage, "Type to filter codepages (e.g. Russian, Chinese, 936, 1251, Shift, Polish, 866)");
+            ToolTipHelper.SetToolTip(txtSearchCodepage, LanguageManager.GetString("ToolTip.ConvertAnsi.SearchCodepage", "Type to filter codepages (e.g. Russian, Chinese, 936, 1251, Shift, Polish, 866)"));
 
             bool isPlaceholderActive = true;
-            string placeholderText = "🔍 Search...";
+            string placeholderText = LanguageManager.GetString("ConvertAnsi.SearchPlaceholder", "🔍 Search...");
 
             void SetWatermarkState()
             {
@@ -184,7 +183,7 @@ namespace CsfStudio.UI
             };
 
             // --- FILES SELECTOR ---
-            var lblDocs = new Label { Text = "Target Open CSF Files:", Location = new Point(455, 78), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            var lblDocs = new Label { Text = LanguageManager.GetString("ConvertAnsi.TargetFiles", "Target Open CSF Files:"), Location = new Point(455, 78), AutoSize = true, Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
             chkDocuments = new CheckedListBox
             {
                 Location = new Point(455, 98),
@@ -193,16 +192,16 @@ namespace CsfStudio.UI
             };
             chkDocuments.ItemCheck += ChkDocuments_ItemCheck;
 
-            btnSelectAll = new Button { Text = "Select All", Location = new Point(455, 172), Size = new Size(110, 24) };
+            btnSelectAll = new Button { Text = LanguageManager.GetString("ConvertAnsi.SelectAll", "Select All"), Location = new Point(455, 172), Size = new Size(110, 24) };
             btnSelectAll.Click += (s, e) => { SetAllDocsChecked(true); UpdatePreview(); };
 
-            btnDeselectAll = new Button { Text = "Deselect All", Location = new Point(582, 172), Size = new Size(110, 24) };
+            btnDeselectAll = new Button { Text = LanguageManager.GetString("ConvertAnsi.DeselectAll", "Deselect All"), Location = new Point(582, 172), Size = new Size(110, 24) };
             btnDeselectAll.Click += (s, e) => { SetAllDocsChecked(false); UpdatePreview(); };
 
             // --- LIVE PREVIEW ---
             lblPreviewInfo = new Label
             {
-                Text = "Live Conversion Preview (Sample String Entries):",
+                Text = LanguageManager.GetString("ConvertAnsi.LivePreview", "Live Conversion Preview (Sample String Entries):"),
                 Location = new Point(12, 180),
                 AutoSize = true,
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold)
@@ -223,15 +222,15 @@ namespace CsfStudio.UI
                 BackgroundColor = Color.White
             };
 
-            gridPreview.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "File", Width = 130 });
-            gridPreview.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Key", Width = 150 });
-            gridPreview.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Original (Current)", Width = 195 });
-            gridPreview.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Converted (Preview)", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
+            gridPreview.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("ConvertAnsi.ColFile", "File"), Width = 130 });
+            gridPreview.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Grid.Column.Key", "Key"), Width = 150 });
+            gridPreview.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("ConvertAnsi.ColOriginal", "Original (Current)"), Width = 195 });
+            gridPreview.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("ConvertAnsi.ColConverted", "Converted (Preview)"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
 
             // --- BUTTONS ---
             btnConvert = new Button
             {
-                Text = "🔤 Convert Selected Files",
+                Text = LanguageManager.GetString("ConvertAnsi.BtnConvert", "🔤 Convert Selected Files"),
                 Location = new Point(410, 476),
                 Size = new Size(200, 32),
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
@@ -241,7 +240,7 @@ namespace CsfStudio.UI
 
             btnCancel = new Button
             {
-                Text = "Cancel",
+                Text = LanguageManager.GetString("Button.Cancel", "Cancel"),
                 DialogResult = DialogResult.Cancel,
                 Location = new Point(618, 476),
                 Size = new Size(74, 32)
@@ -280,24 +279,24 @@ namespace CsfStudio.UI
         {
             var curatedList = new List<CodepageOption>
             {
-                new CodepageOption { CodePage = 1252, DisplayName = "Windows-1252 — Western European (Spanish / English / German / French)" },
-                new CodepageOption { CodePage = 1251, DisplayName = "Windows-1251 — Cyrillic (Russian / Ukrainian / Bulgarian)" },
-                new CodepageOption { CodePage = 866,  DisplayName = "CP866 — MS-DOS Russian / Cyrillic" },
-                new CodepageOption { CodePage = 20866, DisplayName = "KOI8-R — Russian / Cyrillic Unix" },
-                new CodepageOption { CodePage = 936,  DisplayName = "GBK / GB2312 (CP936) — Chinese Simplified (简体中文)" },
-                new CodepageOption { CodePage = 950,  DisplayName = "Big5 (CP950) — Chinese Traditional (繁體中文)" },
-                new CodepageOption { CodePage = 932,  DisplayName = "Shift-JIS / Windows-932 — Japanese (日本語)" },
-                new CodepageOption { CodePage = 949,  DisplayName = "EUC-KR / Windows-949 — Korean (한국어)" },
-                new CodepageOption { CodePage = 1250, DisplayName = "Windows-1250 — Central European (Polish / Czech / Hungarian / Slovak)" },
-                new CodepageOption { CodePage = 1254, DisplayName = "Windows-1254 — Turkish" },
-                new CodepageOption { CodePage = 1253, DisplayName = "Windows-1253 — Greek" },
-                new CodepageOption { CodePage = 1257, DisplayName = "Windows-1257 — Baltic (Estonian / Latvian / Lithuanian)" },
-                new CodepageOption { CodePage = 1256, DisplayName = "Windows-1256 — Arabic" },
-                new CodepageOption { CodePage = 1255, DisplayName = "Windows-1255 — Hebrew" },
-                new CodepageOption { CodePage = 1258, DisplayName = "Windows-1258 — Vietnamese" },
-                new CodepageOption { CodePage = 874,  DisplayName = "Windows-874 / TIS-620 — Thai" },
-                new CodepageOption { CodePage = 28591, DisplayName = "ISO-8859-1 — Latin-1 Western European" },
-                new CodepageOption { CodePage = 65001, DisplayName = "UTF-8 — Unicode UTF-8" }
+                new CodepageOption { CodePage = 1252, DisplayName = LanguageManager.GetString("Codepage.1252", "Windows-1252 — Western European (Spanish / English / German / French)") },
+                new CodepageOption { CodePage = 1251, DisplayName = LanguageManager.GetString("Codepage.1251", "Windows-1251 — Cyrillic (Russian / Ukrainian / Bulgarian)") },
+                new CodepageOption { CodePage = 866,  DisplayName = LanguageManager.GetString("Codepage.866", "CP866 — MS-DOS Russian / Cyrillic") },
+                new CodepageOption { CodePage = 20866, DisplayName = LanguageManager.GetString("Codepage.20866", "KOI8-R — Russian / Cyrillic Unix") },
+                new CodepageOption { CodePage = 936,  DisplayName = LanguageManager.GetString("Codepage.936", "GBK / GB2312 (CP936) — Chinese Simplified (简体中文)") },
+                new CodepageOption { CodePage = 950,  DisplayName = LanguageManager.GetString("Codepage.950", "Big5 (CP950) — Chinese Traditional (繁體中文)") },
+                new CodepageOption { CodePage = 932,  DisplayName = LanguageManager.GetString("Codepage.932", "Shift-JIS / Windows-932 — Japanese (日本語)") },
+                new CodepageOption { CodePage = 949,  DisplayName = LanguageManager.GetString("Codepage.949", "EUC-KR / Windows-949 — Korean (한국어)") },
+                new CodepageOption { CodePage = 1250, DisplayName = LanguageManager.GetString("Codepage.1250", "Windows-1250 — Central European (Polish / Czech / Hungarian / Slovak)") },
+                new CodepageOption { CodePage = 1254, DisplayName = LanguageManager.GetString("Codepage.1254", "Windows-1254 — Turkish") },
+                new CodepageOption { CodePage = 1253, DisplayName = LanguageManager.GetString("Codepage.1253", "Windows-1253 — Greek") },
+                new CodepageOption { CodePage = 1257, DisplayName = LanguageManager.GetString("Codepage.1257", "Windows-1257 — Baltic (Estonian / Latvian / Lithuanian)") },
+                new CodepageOption { CodePage = 1256, DisplayName = LanguageManager.GetString("Codepage.1256", "Windows-1256 — Arabic") },
+                new CodepageOption { CodePage = 1255, DisplayName = LanguageManager.GetString("Codepage.1255", "Windows-1255 — Hebrew") },
+                new CodepageOption { CodePage = 1258, DisplayName = LanguageManager.GetString("Codepage.1258", "Windows-1258 — Vietnamese") },
+                new CodepageOption { CodePage = 874,  DisplayName = LanguageManager.GetString("Codepage.874", "Windows-874 / TIS-620 — Thai") },
+                new CodepageOption { CodePage = 28591, DisplayName = LanguageManager.GetString("Codepage.28591", "ISO-8859-1 — Latin-1 Western European") },
+                new CodepageOption { CodePage = 65001, DisplayName = LanguageManager.GetString("Codepage.65001", "UTF-8 — Unicode UTF-8") }
             };
 
             var existingCodes = new HashSet<int>(curatedList.Select(c => c.CodePage));
@@ -361,7 +360,7 @@ namespace CsfStudio.UI
         {
             if (cboCodepage != null && cboCodepage.SelectedItem is CodepageOption opt)
             {
-                ToolTipHelper.SetToolTip(cboCodepage, $"Encoding Codepage {opt.CodePage}:\n{opt.DisplayName}", 70);
+                ToolTipHelper.SetToolTip(cboCodepage, string.Format(LanguageManager.GetString("ConvertAnsi.CodepageToolTip", "Encoding Codepage {0}:\n{1}"), opt.CodePage, opt.DisplayName), 70);
             }
         }
 
@@ -419,7 +418,7 @@ namespace CsfStudio.UI
             var selectedDocs = SelectedDocuments;
             if (selectedDocs.Count == 0)
             {
-                lblPreviewInfo.Text = "Live Conversion Preview: (No files selected)";
+                lblPreviewInfo.Text = LanguageManager.GetString("ConvertAnsi.PreviewNoFiles", "Live Conversion Preview: (No files selected)");
                 btnConvert.Enabled = false;
                 return;
             }
@@ -470,8 +469,8 @@ namespace CsfStudio.UI
 
             string encName = enc != null ? $"{enc.EncodingName} (CP {enc.CodePage})" : "Unknown";
             lblPreviewInfo.Text = count == 0
-                ? "Live Conversion Preview: (No non-empty string entries found in selected files)"
-                : $"Live Conversion Preview (Showing sample entries converted using {encName}):";
+                ? LanguageManager.GetString("ConvertAnsi.PreviewNoStrings", "Live Conversion Preview: (No non-empty string entries found in selected files)")
+                : string.Format(LanguageManager.GetString("ConvertAnsi.PreviewSampleFormat", "Live Conversion Preview (Showing sample entries converted using {0}):"), encName);
         }
 
         private void BtnConvert_Click(object sender, EventArgs e)
@@ -479,7 +478,11 @@ namespace CsfStudio.UI
             var selectedDocs = SelectedDocuments;
             if (selectedDocs.Count == 0)
             {
-                MessageBox.Show("Please select at least one open CSF file to convert.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.SelectCsfToConvert", "Please select at least one open CSF file to convert."),
+                    LanguageManager.GetString("Title.NoSelection", "No Selection"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
                 return;
             }
 
@@ -487,9 +490,8 @@ namespace CsfStudio.UI
             SaveSelectedCodepageToConfig();
 
             var confirm = MessageBox.Show(
-                $"Are you sure you want to convert all string entries in the {selectedDocs.Count} selected CSF file(s) using codepage '{enc.EncodingName}' (CP {enc.CodePage})?\n\n" +
-                "This operation re-encodes raw ANSI/multibyte byte values into standard Unicode strings. Affected files will be marked as modified (*).",
-                "Confirm Encoding Conversion",
+                string.Format(LanguageManager.GetString("Msg.ConfirmAnsiConvertFormat", "Are you sure you want to convert all string entries in the {0} selected CSF file(s) using codepage '{1}' (CP {2})?\n\nThis operation re-encodes raw ANSI/multibyte byte values into standard Unicode strings. Affected files will be marked as modified (*)."), selectedDocs.Count, enc.EncodingName, enc.CodePage),
+                LanguageManager.GetString("Title.ConfirmEncodingConversion", "Confirm Encoding Conversion"),
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Question);
 

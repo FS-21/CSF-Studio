@@ -64,7 +64,11 @@ namespace CsfStudio.Core
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to associate .CSF extension in registry:\n{ex.Message}", "Association Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Msg.FailedToAssociateCsfFormat", "Failed to associate .CSF extension in registry:\n{0}"), ex.Message),
+                    LanguageManager.GetString("Title.AssociationError", "Association Error"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
                 return false;
             }
         }

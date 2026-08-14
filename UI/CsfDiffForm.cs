@@ -63,7 +63,7 @@ namespace CsfStudio.UI
 
         private void InitializeComponent()
         {
-            this.Text = "🔀 CSF Diff & Merge";
+            this.Text = LanguageManager.GetString("Diff.Title", "🔀 CSF Diff & Merge");
             this.Size = new Size(1050, 700);
             this.MinimumSize = new Size(850, 520);
             this.StartPosition = FormStartPosition.CenterParent;
@@ -73,17 +73,17 @@ namespace CsfStudio.UI
             // Top Panel (File Selectors)
             var pnlTop = new Panel { Dock = DockStyle.Top, Height = 75, BackColor = Color.FromArgb(243, 244, 246), Padding = new Padding(12, 8, 12, 8) };
 
-            var lblA = new Label { Text = "📄 CSF de Referencia:", Location = new Point(12, 12), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
+            var lblA = new Label { Text = LanguageManager.GetString("Diff.RefFile", "📄 Reference CSF:"), Location = new Point(12, 12), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
             cboFileA = new ComboBox { Location = new Point(165, 9), Size = new Size(300, 23), DropDownStyle = ComboBoxStyle.DropDownList };
-            btnBrowseA = new Button { Text = "📁 Browse...", Location = new Point(472, 8), Size = new Size(80, 25) };
+            btnBrowseA = new Button { Text = LanguageManager.GetString("Button.Browse", "📁 Browse..."), Location = new Point(472, 8), Size = new Size(80, 25) };
 
-            var lblB = new Label { Text = "🎯 CSF Externo:", Location = new Point(12, 42), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
+            var lblB = new Label { Text = LanguageManager.GetString("Diff.TargetFile", "🎯 Target CSF:"), Location = new Point(12, 42), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
             cboFileB = new ComboBox { Location = new Point(165, 39), Size = new Size(300, 23), DropDownStyle = ComboBoxStyle.DropDownList };
-            btnBrowseB = new Button { Text = "📁 Browse...", Location = new Point(472, 38), Size = new Size(80, 25) };
+            btnBrowseB = new Button { Text = LanguageManager.GetString("Button.Browse", "📁 Browse..."), Location = new Point(472, 38), Size = new Size(80, 25) };
 
             var btnCompare = new Button
             {
-                Text = "⚡ Compare Now",
+                Text = LanguageManager.GetString("Diff.CompareNow", "⚡ Compare Now"),
                 Location = new Point(565, 8),
                 Size = new Size(120, 55),
                 Font = new Font(FontFamily.GenericSansSerif, 9f, FontStyle.Bold),
@@ -91,11 +91,11 @@ namespace CsfStudio.UI
                 ForeColor = Color.White
             };
 
-            ToolTipHelper.SetToolTip(cboFileA, "Select the Reference CSF document from the active session");
-            ToolTipHelper.SetToolTip(btnBrowseA, "Load an external CSF file as the Reference document");
-            ToolTipHelper.SetToolTip(cboFileB, "Select the target CSF document to compare from session or external file");
-            ToolTipHelper.SetToolTip(btnBrowseB, "Load an external CSF file to compare");
-            ToolTipHelper.SetToolTip(btnCompare, "Execute detailed comparison between both CSF files");
+            ToolTipHelper.SetToolTip(cboFileA, LanguageManager.GetString("ToolTip.Diff.RefFile", "Select the Reference CSF document from the active session"));
+            ToolTipHelper.SetToolTip(btnBrowseA, LanguageManager.GetString("ToolTip.Diff.BrowseRef", "Load an external CSF file as the Reference document"));
+            ToolTipHelper.SetToolTip(cboFileB, LanguageManager.GetString("ToolTip.Diff.TargetFile", "Select the target CSF document to compare from session or external file"));
+            ToolTipHelper.SetToolTip(btnBrowseB, LanguageManager.GetString("ToolTip.Diff.BrowseExt", "Load an external CSF file to compare"));
+            ToolTipHelper.SetToolTip(btnCompare, LanguageManager.GetString("ToolTip.Diff.CompareNow", "Execute detailed comparison between both CSF files"));
 
             pnlTop.Controls.Add(lblA);
             pnlTop.Controls.Add(cboFileA);
@@ -108,26 +108,26 @@ namespace CsfStudio.UI
             // Toolbar Panel
             var pnlToolbar = new Panel { Dock = DockStyle.Top, Height = 45, BackColor = Color.FromArgb(249, 250, 251), Padding = new Padding(12, 6, 12, 6) };
 
-            btnPrevDiff = new Button { Text = "⬆️ Prev (F7)", Location = new Point(12, 8), Size = new Size(90, 28), Font = new Font(FontFamily.GenericSansSerif, 8f, FontStyle.Bold) };
-            ToolTipHelper.SetToolTip(btnPrevDiff, "Jump to previous difference (Shortcut: F7)");
+            btnPrevDiff = new Button { Text = LanguageManager.GetString("Diff.PrevDiff", "⬆️ Prev (F7)"), Location = new Point(12, 8), Size = new Size(90, 28), Font = new Font(FontFamily.GenericSansSerif, 8f, FontStyle.Bold) };
+            ToolTipHelper.SetToolTip(btnPrevDiff, LanguageManager.GetString("ToolTip.Diff.PrevDiff", "Jump to previous difference (Shortcut: F7)"));
 
-            btnNextDiff = new Button { Text = "⬇️ Next (F8)", Location = new Point(108, 8), Size = new Size(90, 28), Font = new Font(FontFamily.GenericSansSerif, 8f, FontStyle.Bold) };
-            ToolTipHelper.SetToolTip(btnNextDiff, "Jump to next difference (Shortcut: F8)");
+            btnNextDiff = new Button { Text = LanguageManager.GetString("Diff.NextDiff", "⬇️ Next (F8)"), Location = new Point(108, 8), Size = new Size(90, 28), Font = new Font(FontFamily.GenericSansSerif, 8f, FontStyle.Bold) };
+            ToolTipHelper.SetToolTip(btnNextDiff, LanguageManager.GetString("ToolTip.Diff.NextDiff", "Jump to next difference (Shortcut: F8)"));
 
-            lblDiffCounter = new Label { Text = "Diff: 0 of 0", Location = new Point(205, 14), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold), ForeColor = Color.FromArgb(55, 65, 81) };
+            lblDiffCounter = new Label { Text = string.Format(LanguageManager.GetString("Diff.CounterFormat", "Diff: {0} of {1}"), 0, 0), Location = new Point(205, 14), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold), ForeColor = Color.FromArgb(55, 65, 81) };
 
-            int filterX = 295;
-            btnFilterAll = new Button { Text = "All (0)", Location = new Point(filterX, 8), Size = new Size(65, 28), BackColor = Color.FromArgb(229, 231, 235) };
-            ToolTipHelper.SetToolTip(btnFilterAll, "Show all keys from both CSF files");
+            int filterX = 310;
+            btnFilterAll = new Button { Text = string.Format(LanguageManager.GetString("Diff.FilterAllCountFormat", "All ({0})"), 0), Location = new Point(filterX, 8), Size = new Size(65, 28), BackColor = Color.FromArgb(229, 231, 235) };
+            ToolTipHelper.SetToolTip(btnFilterAll, LanguageManager.GetString("ToolTip.Diff.FilterAll", "Show all keys from both CSF files"));
 
-            btnFilterModified = new Button { Text = "Modified (0)", Location = new Point(filterX + 70, 8), Size = new Size(95, 28) };
-            ToolTipHelper.SetToolTip(btnFilterModified, "Show only modified keys with differing text");
+            btnFilterModified = new Button { Text = string.Format(LanguageManager.GetString("Diff.FilterModifiedCountFormat", "Modified ({0})"), 0), Location = new Point(filterX + 70, 8), Size = new Size(95, 28) };
+            ToolTipHelper.SetToolTip(btnFilterModified, LanguageManager.GetString("ToolTip.Diff.FilterModified", "Show only modified keys with differing text"));
 
-            btnFilterAdded = new Button { Text = "Added (0)", Location = new Point(filterX + 170, 8), Size = new Size(85, 28) };
-            ToolTipHelper.SetToolTip(btnFilterAdded, "Show only new keys present in external file");
+            btnFilterAdded = new Button { Text = string.Format(LanguageManager.GetString("Diff.FilterAddedCountFormat", "Added ({0})"), 0), Location = new Point(filterX + 170, 8), Size = new Size(85, 28) };
+            ToolTipHelper.SetToolTip(btnFilterAdded, LanguageManager.GetString("ToolTip.Diff.FilterAdded", "Show only new keys present in external file"));
 
-            btnFilterRemoved = new Button { Text = "Removed (0)", Location = new Point(filterX + 260, 8), Size = new Size(95, 28) };
-            ToolTipHelper.SetToolTip(btnFilterRemoved, "Show only keys missing in external file");
+            btnFilterRemoved = new Button { Text = string.Format(LanguageManager.GetString("Diff.FilterRemovedCountFormat", "Removed ({0})"), 0), Location = new Point(filterX + 260, 8), Size = new Size(95, 28) };
+            ToolTipHelper.SetToolTip(btnFilterRemoved, LanguageManager.GetString("ToolTip.Diff.FilterRemoved", "Show only keys missing in external file"));
 
             // Right-aligned Actions Panel
             var pnlActions = new Panel
@@ -138,17 +138,17 @@ namespace CsfStudio.UI
                 BackColor = Color.Transparent
             };
 
-            btnCopyBToA = new Button { Text = "← External to Ref", Location = new Point(0, 4), Size = new Size(110, 28), Font = new Font(FontFamily.GenericSansSerif, 8f, FontStyle.Bold) };
-            ToolTipHelper.SetToolTip(btnCopyBToA, "Copy selected values from External CSF to Reference CSF");
+            btnCopyBToA = new Button { Text = LanguageManager.GetString("Diff.CopyExtToRef", "← External to Ref"), Location = new Point(0, 4), Size = new Size(110, 28), Font = new Font(FontFamily.GenericSansSerif, 8f, FontStyle.Bold) };
+            ToolTipHelper.SetToolTip(btnCopyBToA, LanguageManager.GetString("ToolTip.Diff.CopyExtToRef", "Copy selected values from External CSF to Reference CSF"));
 
-            btnCopyAToB = new Button { Text = "→ Ref to External", Location = new Point(115, 4), Size = new Size(110, 28), Font = new Font(FontFamily.GenericSansSerif, 8f, FontStyle.Bold) };
-            ToolTipHelper.SetToolTip(btnCopyAToB, "Copy selected values from Reference CSF to External CSF");
+            btnCopyAToB = new Button { Text = LanguageManager.GetString("Diff.CopyRefToExt", "→ Ref to External"), Location = new Point(115, 4), Size = new Size(110, 28), Font = new Font(FontFamily.GenericSansSerif, 8f, FontStyle.Bold) };
+            ToolTipHelper.SetToolTip(btnCopyAToB, LanguageManager.GetString("ToolTip.Diff.CopyRefToExt", "Copy selected values from Reference CSF to External CSF"));
 
-            btnSaveA = new Button { Text = "💾 Save Ref", Location = new Point(230, 4), Size = new Size(90, 28), Font = new Font(FontFamily.GenericSansSerif, 8f, FontStyle.Bold), BackColor = Color.FromArgb(220, 252, 231) };
-            ToolTipHelper.SetToolTip(btnSaveA, "Save all changes made to Reference CSF");
+            btnSaveA = new Button { Text = LanguageManager.GetString("Diff.SaveRef", "💾 Save Ref"), Location = new Point(230, 4), Size = new Size(90, 28), Font = new Font(FontFamily.GenericSansSerif, 8f, FontStyle.Bold), BackColor = Color.FromArgb(220, 252, 231) };
+            ToolTipHelper.SetToolTip(btnSaveA, LanguageManager.GetString("ToolTip.Diff.SaveRef", "Save all changes made to Reference CSF"));
 
-            btnSaveB = new Button { Text = "💾 Save Ext", Location = new Point(325, 4), Size = new Size(90, 28), Font = new Font(FontFamily.GenericSansSerif, 8f, FontStyle.Bold), BackColor = Color.FromArgb(220, 252, 231) };
-            ToolTipHelper.SetToolTip(btnSaveB, "Save all changes made to External CSF");
+            btnSaveB = new Button { Text = LanguageManager.GetString("Diff.SaveExt", "💾 Save Ext"), Location = new Point(325, 4), Size = new Size(90, 28), Font = new Font(FontFamily.GenericSansSerif, 8f, FontStyle.Bold), BackColor = Color.FromArgb(220, 252, 231) };
+            ToolTipHelper.SetToolTip(btnSaveB, LanguageManager.GetString("ToolTip.Diff.SaveExt", "Save all changes made to External CSF"));
 
             pnlActions.Controls.Add(btnCopyBToA);
             pnlActions.Controls.Add(btnCopyAToB);
@@ -179,10 +179,10 @@ namespace CsfStudio.UI
                 BackgroundColor = Color.White
             };
 
-            gridDiff.Columns.Add(new DataGridViewTextBoxColumn { Name = "colStatus", HeaderText = "ST", Width = 40, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, Font = new Font(FontFamily.GenericSansSerif, 10f, FontStyle.Bold) } });
-            gridDiff.Columns.Add(new DataGridViewTextBoxColumn { Name = "colKey", HeaderText = "Key Name", Width = 220, DefaultCellStyle = new DataGridViewCellStyle { Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) } });
-            gridDiff.Columns.Add(new DataGridViewTextBoxColumn { Name = "colValA", HeaderText = "Texto CSF Referencia", Width = 380 });
-            gridDiff.Columns.Add(new DataGridViewTextBoxColumn { Name = "colValB", HeaderText = "Texto CSF Externo", Width = 380 });
+            gridDiff.Columns.Add(new DataGridViewTextBoxColumn { Name = "colStatus", HeaderText = LanguageManager.GetString("Grid.Column.Status", "ST"), Width = 40, DefaultCellStyle = new DataGridViewCellStyle { Alignment = DataGridViewContentAlignment.MiddleCenter, Font = new Font(FontFamily.GenericSansSerif, 10f, FontStyle.Bold) } });
+            gridDiff.Columns.Add(new DataGridViewTextBoxColumn { Name = "colKey", HeaderText = LanguageManager.GetString("Grid.Column.Key", "Key Name"), Width = 220, DefaultCellStyle = new DataGridViewCellStyle { Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) } });
+            gridDiff.Columns.Add(new DataGridViewTextBoxColumn { Name = "colValA", HeaderText = LanguageManager.GetString("Diff.ColRefText", "Reference CSF Text"), Width = 380 });
+            gridDiff.Columns.Add(new DataGridViewTextBoxColumn { Name = "colValB", HeaderText = LanguageManager.GetString("Diff.ColExtText", "External CSF Text"), Width = 380 });
 
             gridDiff.CellFormatting += GridDiff_CellFormatting;
             gridDiff.SelectionChanged += GridDiff_SelectionChanged;
@@ -190,7 +190,7 @@ namespace CsfStudio.UI
 
             // Status Strip
             statusStrip = new StatusStrip();
-            lblStatusInfo = new ToolStripStatusLabel { Text = "Select two CSF documents and click 'Compare Now'." };
+            lblStatusInfo = new ToolStripStatusLabel { Text = LanguageManager.GetString("Diff.StatusInfo", "Select two CSF documents and click 'Compare Now'.") };
             statusStrip.Items.Add(lblStatusInfo);
 
             this.Controls.Add(gridDiff);
@@ -261,14 +261,17 @@ namespace CsfStudio.UI
         {
             using (var dlg = new OpenFileDialog())
             {
-                dlg.Filter = "CSF Files (*.csf)|*.csf|All Files (*.*)|*.*";
-                dlg.Title = isFileA ? "Select Base CSF File (File A)" : "Select Target CSF File (File B)";
+                dlg.Filter = LanguageManager.GetString("Diff.FileFilter", "Command & Conquer String Table (*.csf)|*.csf");
+                dlg.Title = isFileA
+                    ? LanguageManager.GetString("Diff.SelectBaseCsf", "Select Base CSF File (File A)")
+                    : LanguageManager.GetString("Diff.SelectTargetCsf", "Select Target CSF File (File B)");
                 if (dlg.ShowDialog(this) == DialogResult.OK)
                 {
                     try
                     {
                         var doc = CsfFileHandler.Load(dlg.FileName);
-                        var comboItem = new ComboDocItem { Doc = doc, Path = dlg.FileName, Title = $"[External] {Path.GetFileName(dlg.FileName)}" };
+                        string extTag = LanguageManager.GetString("Diff.ExternalTag", "[External]");
+                        var comboItem = new ComboDocItem { Doc = doc, Path = dlg.FileName, Title = $"{extTag} {Path.GetFileName(dlg.FileName)}" };
 
                         ComboBox cbo = isFileA ? cboFileA : cboFileB;
                         cbo.Items.Add(comboItem);
@@ -276,7 +279,11 @@ namespace CsfStudio.UI
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show($"Failed to load CSF file:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        MessageBox.Show(
+                            string.Format(LanguageManager.GetString("Msg.FailedToLoadCsfFormat", "Failed to load CSF file:\n{0}"), ex.Message),
+                            LanguageManager.GetString("Title.Error", "Error"),
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error);
                     }
                 }
             }
@@ -295,7 +302,11 @@ namespace CsfStudio.UI
 
             if (_docA == null || _docB == null)
             {
-                MessageBox.Show("Please select two valid CSF documents to compare.", "Comparison Required", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.SelectTwoCsfToCompare", "Please select two valid CSF documents to compare."),
+                    LanguageManager.GetString("Title.ComparisonRequired", "Comparison Required"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
                 return;
             }
 
@@ -303,16 +314,18 @@ namespace CsfStudio.UI
             UpdateFilterButtons();
             ApplyFilterAndRefreshGrid();
 
-            lblStatusInfo.Text = $"Comparison complete: {_diffResult.TotalCount} total keys, {_diffResult.ModifiedCount} modified, {_diffResult.AddedCount} added, {_diffResult.RemovedCount} removed.";
+            lblStatusInfo.Text = string.Format(
+                LanguageManager.GetString("Diff.ComparisonCompleteFormat", "Comparison complete: {0} total keys, {1} modified, {2} added, {3} removed."),
+                _diffResult.TotalCount, _diffResult.ModifiedCount, _diffResult.AddedCount, _diffResult.RemovedCount);
         }
 
         private void UpdateFilterButtons()
         {
             if (_diffResult == null) return;
-            btnFilterAll.Text = $"All ({_diffResult.TotalCount})";
-            btnFilterModified.Text = $"Modified ({_diffResult.ModifiedCount})";
-            btnFilterAdded.Text = $"Added ({_diffResult.AddedCount})";
-            btnFilterRemoved.Text = $"Removed ({_diffResult.RemovedCount})";
+            btnFilterAll.Text = string.Format(LanguageManager.GetString("Diff.FilterAllCountFormat", "All ({0})"), _diffResult.TotalCount);
+            btnFilterModified.Text = string.Format(LanguageManager.GetString("Diff.FilterModifiedCountFormat", "Modified ({0})"), _diffResult.ModifiedCount);
+            btnFilterAdded.Text = string.Format(LanguageManager.GetString("Diff.FilterAddedCountFormat", "Added ({0})"), _diffResult.AddedCount);
+            btnFilterRemoved.Text = string.Format(LanguageManager.GetString("Diff.FilterRemovedCountFormat", "Removed ({0})"), _diffResult.RemovedCount);
         }
 
         private void SetFilter(CsfDiffStatus? status)
@@ -357,7 +370,8 @@ namespace CsfStudio.UI
                     default: statusSymbol = " "; break;
                 }
 
-                int rowIdx = gridDiff.Rows.Add(statusSymbol, item.Key, item.ValueA ?? "<Missing>", item.ValueB ?? "<Missing>");
+                string missingPlaceholder = LanguageManager.GetString("Grid.EmptyMissing", "(Empty / Missing)");
+                int rowIdx = gridDiff.Rows.Add(statusSymbol, item.Key, item.ValueA ?? missingPlaceholder, item.ValueB ?? missingPlaceholder);
                 gridDiff.Rows[rowIdx].Tag = item;
             }
 
@@ -396,7 +410,7 @@ namespace CsfStudio.UI
         {
             if (gridDiff.CurrentRow == null || _diffResult == null)
             {
-                lblDiffCounter.Text = $"Diff: 0 of {_diffResult?.TotalDifferences ?? 0}";
+                lblDiffCounter.Text = string.Format(LanguageManager.GetString("Diff.CounterFormat", "Diff: {0} of {1}"), 0, _diffResult?.TotalDifferences ?? 0);
                 return;
             }
 
@@ -412,7 +426,7 @@ namespace CsfStudio.UI
                 }
             }
 
-            lblDiffCounter.Text = $"Diff: {diffIndex} of {totalDiffs}";
+            lblDiffCounter.Text = string.Format(LanguageManager.GetString("Diff.CounterFormat", "Diff: {0} of {1}"), diffIndex, totalDiffs);
         }
 
         private void JumpToNextDiff()
@@ -500,15 +514,18 @@ namespace CsfStudio.UI
                         }
                     }
 
-                    row.Cells["colValA"].Value = item.ValueA ?? "<Missing>";
-                    row.Cells["colValB"].Value = item.ValueB ?? "<Missing>";
+                    string missingPlaceholder = LanguageManager.GetString("Grid.EmptyMissing", "(Empty / Missing)");
+                    row.Cells["colValA"].Value = item.ValueA ?? missingPlaceholder;
+                    row.Cells["colValB"].Value = item.ValueB ?? missingPlaceholder;
                     row.Cells["colStatus"].Value = item.Status == CsfDiffStatus.Unchanged ? " " : (item.Status == CsfDiffStatus.Added ? "+" : (item.Status == CsfDiffStatus.Modified ? "~" : "-"));
                 }
             }
 
             UpdateFilterButtons();
             gridDiff.Invalidate();
-            lblStatusInfo.Text = fromBtoA ? "Merged selected entries from Target CSF → Base CSF." : "Merged selected entries from Base CSF → Target CSF.";
+            lblStatusInfo.Text = fromBtoA
+                ? LanguageManager.GetString("Diff.MergedTargetToBase", "Merged selected entries from Target CSF → Base CSF.")
+                : LanguageManager.GetString("Diff.MergedBaseToTarget", "Merged selected entries from Base CSF → Target CSF.");
         }
 
         private void GridDiff_CellContextMenuStripNeeded(object sender, DataGridViewCellContextMenuStripNeededEventArgs e)
@@ -517,8 +534,8 @@ namespace CsfStudio.UI
             gridDiff.Rows[e.RowIndex].Selected = true;
 
             var menu = new ContextMenuStrip();
-            menu.Items.Add("⬅️ Copy Target Value → Base CSF", null, (s, ev) => CopySelectedRows(fromBtoA: true));
-            menu.Items.Add("➡️ Copy Base Value → Target CSF", null, (s, ev) => CopySelectedRows(fromBtoA: false));
+            menu.Items.Add(LanguageManager.GetString("Diff.CopyTargetToBase", "⬅️ Copy Target Value → Base CSF"), null, (s, ev) => CopySelectedRows(fromBtoA: true));
+            menu.Items.Add(LanguageManager.GetString("Diff.CopyBaseToTarget", "➡️ Copy Base Value → Target CSF"), null, (s, ev) => CopySelectedRows(fromBtoA: false));
 
             e.ContextMenuStrip = menu;
         }
@@ -534,7 +551,7 @@ namespace CsfStudio.UI
             {
                 using (var dlg = new SaveFileDialog())
                 {
-                    dlg.Filter = "CSF Files (*.csf)|*.csf";
+                    dlg.Filter = LanguageManager.GetString("Filter.CsfFilesOnly", "Command & Conquer String Table (*.csf)|*.csf");
                     if (dlg.ShowDialog(this) == DialogResult.OK)
                     {
                         targetPath = dlg.FileName;
@@ -551,11 +568,19 @@ namespace CsfStudio.UI
             try
             {
                 CsfFileHandler.Save(doc, targetPath);
-                MessageBox.Show($"File successfully saved to:\n{targetPath}", "File Saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Msg.FileSavedToFormat", "File successfully saved to:\n{0}"), targetPath),
+                    LanguageManager.GetString("Title.FileSaved", "File Saved"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to save CSF file:\n{ex.Message}", "Save Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Msg.FailedToSaveCsfFormat", "Failed to save CSF file:\n{0}"), ex.Message),
+                    LanguageManager.GetString("Title.SaveError", "Save Error"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
         }
 

@@ -35,14 +35,14 @@ namespace CsfStudio.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Batch Key Rename with Live Preview";
+            this.Text = LanguageManager.GetString("BatchRename.Title", "Batch Key Rename with Live Preview");
             this.Size = new Size(720, 500);
             this.StartPosition = FormStartPosition.CenterParent;
             this.ShowIcon = false;
 
             var panelTop = new Panel { Dock = DockStyle.Top, Height = 95, Padding = new Padding(10) };
 
-            var lblFind = new Label { Text = "Find in Name:", Location = new Point(10, 15), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
+            var lblFind = new Label { Text = LanguageManager.GetString("BatchRename.FindInName", "Find in Name:"), Location = new Point(10, 15), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
             cboFindPattern = new ComboBox
             {
                 Location = new Point(120, 12),
@@ -52,7 +52,7 @@ namespace CsfStudio.UI
                 AutoCompleteSource = AutoCompleteSource.ListItems
             };
 
-            var lblReplace = new Label { Text = "Replace with:", Location = new Point(360, 15), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
+            var lblReplace = new Label { Text = LanguageManager.GetString("BatchRename.ReplaceWith", "Replace with:"), Location = new Point(360, 15), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
             cboReplacePattern = new ComboBox
             {
                 Location = new Point(460, 12),
@@ -62,10 +62,10 @@ namespace CsfStudio.UI
                 AutoCompleteSource = AutoCompleteSource.ListItems
             };
 
-            chkUseRegex = new CheckBox { Text = "Use Regular Expressions (RegEx)", Location = new Point(120, 48), AutoSize = true };
+            chkUseRegex = new CheckBox { Text = LanguageManager.GetString("BatchRename.UseRegex", "Use Regular Expressions (RegEx)"), Location = new Point(120, 48), AutoSize = true };
             chkUseRegex.CheckedChanged += (s, e) => LoadHistoryToCombos();
 
-            btnPreview = new Button { Text = "🔍 Live Preview", Location = new Point(460, 45), Size = new Size(220, 28), Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
+            btnPreview = new Button { Text = LanguageManager.GetString("BatchRename.LivePreview", "🔍 Live Preview"), Location = new Point(460, 45), Size = new Size(220, 28), Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
             btnPreview.Click += (s, e) =>
             {
                 SaveCurrentToHistory();
@@ -91,15 +91,15 @@ namespace CsfStudio.UI
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill
             };
 
-            var colOrig = new DataGridViewTextBoxColumn { HeaderText = "Original Key Name", ReadOnly = true };
-            var colNew = new DataGridViewTextBoxColumn { HeaderText = "New Key Name", ReadOnly = true };
-            var colStatus = new DataGridViewTextBoxColumn { HeaderText = "Status", ReadOnly = true, Width = 120 };
+            var colOrig = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("BatchRename.ColOriginal", "Original Key Name"), ReadOnly = true };
+            var colNew = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("BatchRename.ColNew", "New Key Name"), ReadOnly = true };
+            var colStatus = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Grid.Column.Status", "Status"), ReadOnly = true, Width = 120 };
 
             gridPreview.Columns.AddRange(colOrig, colNew, colStatus);
 
             var panelBottom = new Panel { Dock = DockStyle.Bottom, Height = 50, Padding = new Padding(10) };
-            btnApply = new Button { Text = "Apply Rename", DialogResult = DialogResult.OK, Location = new Point(450, 10), Size = new Size(150, 30), Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
-            btnCancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Location = new Point(610, 10), Size = new Size(90, 30) };
+            btnApply = new Button { Text = LanguageManager.GetString("BatchRename.Apply", "Apply Rename"), DialogResult = DialogResult.OK, Location = new Point(450, 10), Size = new Size(150, 30), Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
+            btnCancel = new Button { Text = LanguageManager.GetString("Button.Cancel", "Cancel"), DialogResult = DialogResult.Cancel, Location = new Point(610, 10), Size = new Size(90, 30) };
 
             btnApply.Click += (s, e) => SaveCurrentToHistory();
 
@@ -113,13 +113,13 @@ namespace CsfStudio.UI
 
         private void SetupToolTips()
         {
-            ToolTipHelper.SetToolTip(cboFindPattern, "Find in Name: Search string or RegEx pattern to match key names. Drop down for history.");
-            ToolTipHelper.SetToolTip(cboReplacePattern, "Replace with: Replacement text for matched keys. Supports RegEx capture groups ($1, $2).");
-            ToolTipHelper.SetToolTip(chkUseRegex, "Use RegEx: Enable Regular Expression pattern matching.");
-            ToolTipHelper.SetToolTip(btnPreview, "Live Preview: Refresh the table preview of renamed key names.");
-            ToolTipHelper.SetToolTip(gridPreview, "Preview Grid: Shows original vs renamed key names.");
-            ToolTipHelper.SetToolTip(btnApply, "Apply Rename: Update key names across open CSF files.");
-            ToolTipHelper.SetToolTip(btnCancel, "Cancel: Close window without changing key names.");
+            ToolTipHelper.SetToolTip(cboFindPattern, LanguageManager.GetString("ToolTip.BatchRename.FindPattern", "Find in Name: Search string or RegEx pattern to match key names. Drop down for history."));
+            ToolTipHelper.SetToolTip(cboReplacePattern, LanguageManager.GetString("ToolTip.BatchRename.ReplacePattern", "Replace with: Replacement text for matched keys. Supports RegEx capture groups ($1, $2)."));
+            ToolTipHelper.SetToolTip(chkUseRegex, LanguageManager.GetString("ToolTip.BatchRename.UseRegex", "Use RegEx: Enable Regular Expression pattern matching."));
+            ToolTipHelper.SetToolTip(btnPreview, LanguageManager.GetString("ToolTip.BatchRename.Preview", "Live Preview: Refresh the table preview of renamed key names."));
+            ToolTipHelper.SetToolTip(gridPreview, LanguageManager.GetString("ToolTip.BatchRename.GridPreview", "Preview Grid: Shows original vs renamed key names."));
+            ToolTipHelper.SetToolTip(btnApply, LanguageManager.GetString("ToolTip.BatchRename.Apply", "Apply Rename: Update key names across open CSF files."));
+            ToolTipHelper.SetToolTip(btnCancel, LanguageManager.GetString("ToolTip.BatchRename.Cancel", "Cancel: Close window without changing key names."));
         }
 
         private void LoadHistoryToCombos()
@@ -192,7 +192,11 @@ namespace CsfStudio.UI
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"RegEx syntax error:\n{ex.Message}", "RegEx Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(
+                        string.Format(LanguageManager.GetString("Msg.RegexSyntaxErrorFormat", "RegEx syntax error:\n{0}"), ex.Message),
+                        LanguageManager.GetString("Title.RegexError", "RegEx Error"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
                     return;
                 }
             }
@@ -220,14 +224,14 @@ namespace CsfStudio.UI
 
                 if (newName != orig)
                 {
-                    status = "✏️ Modified";
+                    status = LanguageManager.GetString("Grid.Status.ModifiedWithIcon", "✏️ Modified");
                     bg = Color.FromArgb(235, 247, 235);
                     RenameMapping[orig] = newName;
                     changedCount++;
                 }
                 else
                 {
-                    status = "Unchanged";
+                    status = LanguageManager.GetString("Grid.Status.Unchanged", "Unchanged");
                     bg = Color.White;
                 }
 

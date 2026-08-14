@@ -61,7 +61,7 @@ namespace CsfStudio.UI
 
         private void InitializeComponent()
         {
-            this.Text = "Multi-CSF Session Manager & File Setup";
+            this.Text = LanguageManager.GetString("SessionManager.Title", "Multi-CSF Session Manager & File Setup");
             this.Size = new Size(980, 600);
             this.MinimumSize = new Size(980, 500);
             this.StartPosition = FormStartPosition.CenterParent;
@@ -77,7 +77,7 @@ namespace CsfStudio.UI
 
             lblHeader = new Label
             {
-                Text = "Configure loaded CSFs. Select one file as Primary CSF file. Label is optional (gray italic shows auto-assigned name):",
+                Text = LanguageManager.GetString("SessionManager.Header", "Configure loaded CSFs. Select one file as Primary CSF file. Label is optional (gray italic shows auto-assigned name):"),
                 Dock = DockStyle.Fill,
                 Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold),
                 TextAlign = ContentAlignment.MiddleLeft
@@ -115,7 +115,7 @@ namespace CsfStudio.UI
 
             btnAddCardBottom = new Button
             {
-                Text = "➕ Add New CSF Slot",
+                Text = LanguageManager.GetString("SessionManager.AddSlot", "➕ Add New CSF Slot"),
                 Location = new Point(12, 11),
                 Size = new Size(185, 33),
                 Font = new Font(FontFamily.GenericSansSerif, 9f, FontStyle.Bold),
@@ -124,7 +124,7 @@ namespace CsfStudio.UI
 
             btnApply = new Button
             {
-                Text = "✔️ Open Session",
+                Text = LanguageManager.GetString("SessionManager.OpenSession", "✔️ Open Session"),
                 DialogResult = DialogResult.OK,
                 Size = new Size(180, 33),
                 Font = new Font(FontFamily.GenericSansSerif, 9.5f, FontStyle.Bold),
@@ -134,7 +134,7 @@ namespace CsfStudio.UI
 
             btnCancel = new Button
             {
-                Text = "Cancel",
+                Text = LanguageManager.GetString("Button.Cancel", "Cancel"),
                 DialogResult = DialogResult.Cancel,
                 Size = new Size(90, 33)
             };
@@ -157,10 +157,10 @@ namespace CsfStudio.UI
             _toolTip.ReshowDelay = 200;
             _toolTip.ShowAlways = true;
 
-            _toolTip.SetToolTip(lblHeader, "Multi-CSF Session Setup: Configure all loaded .CSF string table files for your multi-language project workspace.");
-            _toolTip.SetToolTip(btnAddCardBottom, "Add CSF Slot: Add a new slot card to load another Command & Conquer .CSF file or edit a new language table.");
-            _toolTip.SetToolTip(btnApply, "Open Session: Apply your file setup and open all loaded CSF tables in the main workspace editor.");
-            _toolTip.SetToolTip(btnCancel, "Cancel: Close this session manager dialog without saving configuration changes.");
+            ToolTipHelper.SetToolTip(_toolTip, lblHeader, LanguageManager.GetString("ToolTip.SessionManager.Header", "Multi-CSF Session Setup: Configure all loaded .CSF string table files for your multi-language project workspace."));
+            ToolTipHelper.SetToolTip(_toolTip, btnAddCardBottom, LanguageManager.GetString("ToolTip.SessionManager.AddCard", "Add CSF Slot: Add a new slot card to load another Command & Conquer .CSF file or edit a new language table."));
+            ToolTipHelper.SetToolTip(_toolTip, btnApply, LanguageManager.GetString("ToolTip.SessionManager.Apply", "Open Session: Apply your file setup and open all loaded CSF tables in the main workspace editor."));
+            ToolTipHelper.SetToolTip(_toolTip, btnCancel, LanguageManager.GetString("ToolTip.SessionManager.Cancel", "Cancel: Close this session manager dialog without saving configuration changes."));
 
             panelBottom.Controls.Add(btnAddCardBottom);
             panelBottom.Controls.Add(btnApply);
@@ -265,7 +265,9 @@ namespace CsfStudio.UI
 
             var radioBase = new RadioButton
             {
-                Text = item.IsBaseReference ? "Primary CSF" : "Set Primary CSF",
+                Text = item.IsBaseReference
+                    ? LanguageManager.GetString("SessionManager.PrimaryCsf", "Primary CSF")
+                    : LanguageManager.GetString("SessionManager.SetPrimaryCsf", "Set Primary CSF"),
                 Checked = item.IsBaseReference,
                 Location = new Point(6, 12),
                 Size = new Size(115, 24),
@@ -287,7 +289,7 @@ namespace CsfStudio.UI
                 }
             };
 
-            var lblTagPrompt = new Label { Text = "Label:", Location = new Point(120, 15), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
+            var lblTagPrompt = new Label { Text = LanguageManager.GetString("SessionManager.FileLabel", "Label:"), Location = new Point(120, 15), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
             
             var txtTag = new TextBox
             {
@@ -299,7 +301,7 @@ namespace CsfStudio.UI
 
             var lblTranslationLanguage = new Label
             {
-                Text = "Translation:",
+                Text = LanguageManager.GetString("SessionManager.TranslationLang", "Translation:"),
                 Location = new Point(86, 46),
                 AutoSize = true,
                 Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold)
@@ -323,10 +325,8 @@ namespace CsfStudio.UI
 
             void UpdateTranslationLanguageControls()
             {
-                bool isNeutral = item.Document != null && item.Document.Language == CsfLanguage.LanguageNeutral;
-
-                // Initial value: explicit override, else the header (0x14) language,
-                // else (LanguageNeutral/Unknown) the default source language (English US).
+                // Initial value: explicit override (TranslationContentLanguage),
+                // else the physical header (0x14) language, else default.
                 string language = TranslationLanguageHelper.Normalize(item.TranslationContentLanguage);
                 if (string.IsNullOrEmpty(language))
                 {
@@ -335,11 +335,9 @@ namespace CsfStudio.UI
                 if (string.IsNullOrEmpty(language))
                 {
                     language = TranslationLanguageHelper.GetDefaultSourceLanguage();
-                    if (isNeutral)
-                    {
-                        item.TranslationContentLanguage = language; // remember the neutral default in the session
-                    }
                 }
+
+                item.TranslationContentLanguage = language;
 
                 string display = TranslationLanguageHelper.GetDisplayName(language);
                 isTranslationLanguageSyncing = true;
@@ -416,7 +414,7 @@ namespace CsfStudio.UI
 
             var btnBrowse = new Button
             {
-                Text = "📂 Browse",
+                Text = LanguageManager.GetString("Button.Browse", "📂 Browse"),
                 Location = new Point(8, 43),
                 Size = new Size(74, 24),
                 Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold)
@@ -424,13 +422,15 @@ namespace CsfStudio.UI
 
             var btnRemove = new Button
             {
-                Text = "❌ Remove",
+                Text = LanguageManager.GetString("SessionManager.ButtonRemove", "❌ Remove"),
                 Location = new Point(320, 9),
                 Size = new Size(76, 26),
                 ForeColor = Color.DarkRed
             };
 
-            string fullPathDisplay = string.IsNullOrEmpty(item.FilePath) ? "Unsaved in-memory document" : item.FilePath;
+            string fullPathDisplay = string.IsNullOrEmpty(item.FilePath)
+                ? LanguageManager.GetString("SessionManager.UnsavedInMemoryDoc", "Unsaved in-memory document")
+                : item.FilePath;
             var lblPath = new Label
             {
                 Text = fullPathDisplay,
@@ -446,7 +446,7 @@ namespace CsfStudio.UI
             int keysCount = item.Document?.Labels.Count ?? 0;
             var lblKeys = new Label
             {
-                Text = $"Total Keys: {keysCount:N0}",
+                Text = string.Format(LanguageManager.GetString("SessionManager.TotalKeysFormat", "Total Keys: {0:N0}"), keysCount),
                 Location = new Point(10, 95),
                 AutoSize = true,
                 Font = new Font(FontFamily.GenericSansSerif, 8, FontStyle.Italic)
@@ -454,11 +454,13 @@ namespace CsfStudio.UI
 
             item.KeysLabel = lblKeys;
 
-            string defaultMarker = string.IsNullOrEmpty(item.FilePath) ? " (Default)" : string.Empty;
+            string defaultMarker = string.IsNullOrEmpty(item.FilePath)
+                ? LanguageManager.GetString("SessionManager.DefaultMarker", " (Default)")
+                : string.Empty;
             string detectedLangStr = item.Document != null ? item.Document.Language.ToString() : "EnglishUS";
             var lblDetectedLang = new Label
             {
-                Text = $"Header Lang ID: {detectedLangStr}{defaultMarker}",
+                Text = string.Format(LanguageManager.GetString("SessionManager.HeaderLangIdFormat", "Header Lang ID: {0}{1}"), detectedLangStr, defaultMarker),
                 Location = new Point(140, 95),
                 AutoSize = true,
                 Font = new Font(FontFamily.GenericSansSerif, 8, FontStyle.Regular),
@@ -467,7 +469,7 @@ namespace CsfStudio.UI
 
             var lblError = new Label
             {
-                Text = "⚠️ Duplicate Label!",
+                Text = LanguageManager.GetString("SessionManager.DuplicateLabelError", "⚠️ Duplicate Label!"),
                 Location = new Point(280, 95),
                 AutoSize = true,
                 ForeColor = Color.Red,
@@ -481,8 +483,8 @@ namespace CsfStudio.UI
             {
                 using (var dlg = new OpenFileDialog())
                 {
-                    dlg.Filter = "Command & Conquer String Tables (*.csf)|*.csf|All Files (*.*)|*.*";
-                    dlg.Title = "Select CSF File";
+                    dlg.Filter = LanguageManager.GetString("Filter.CsfOpenFilter", "Command & Conquer String Tables (*.csf)|*.csf|All Files (*.*)|*.*");
+                    dlg.Title = LanguageManager.GetString("SessionManager.SelectCsfTitle", "Select CSF File");
                     var cfg = ConfigManager.LoadConfig();
                     if (cfg != null && !string.IsNullOrWhiteSpace(cfg.LastOpenDirectory) && Directory.Exists(cfg.LastOpenDirectory))
                     {
@@ -494,12 +496,11 @@ namespace CsfStudio.UI
                         {
                             item.Document = CsfFileHandler.Load(dlg.FileName);
                             ToolTipHelper.CheckAndPromptUnknownLanguage(item.Document, dlg.FileName, this);
-                            item.TranslationContentLanguage = string.Empty;
                             item.FilePath = dlg.FileName;
                             lblPath.Text = dlg.FileName;
                             ToolTipHelper.SetToolTip(_toolTip, lblPath, dlg.FileName);
-                            lblKeys.Text = $"Total Keys: {item.Document.Labels.Count:N0}";
-                            lblDetectedLang.Text = $"Header Lang ID: {item.Document.Language}";
+                            lblKeys.Text = string.Format(LanguageManager.GetString("SessionManager.TotalKeysFormat", "Total Keys: {0:N0}"), item.Document.Labels.Count);
+                            lblDetectedLang.Text = string.Format(LanguageManager.GetString("SessionManager.HeaderLangFormat", "Header Lang ID: {0}"), item.Document.Language);
                             UpdateTranslationLanguageControls();
 
                             string dir = Path.GetDirectoryName(dlg.FileName);
@@ -511,7 +512,11 @@ namespace CsfStudio.UI
                         }
                         catch (Exception ex)
                         {
-                            MessageBox.Show($"Error loading CSF file:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            MessageBox.Show(
+                                string.Format(LanguageManager.GetString("Msg.ErrorLoadingCsfFileFormat", "Error loading CSF file:\n{0}"), ex.Message),
+                                LanguageManager.GetString("Title.Error", "Error"),
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Error);
                         }
                     }
                 }
@@ -523,17 +528,17 @@ namespace CsfStudio.UI
                 RebuildFlowPanelCards();
             };
 
-            ToolTipHelper.SetToolTip(_toolTip, radioBase, "Set Primary CSF: Designate this file as the Primary CSF reference. Other files will copy values and sync missing keys from this primary file.");
-            ToolTipHelper.SetToolTip(_toolTip, lblTagPrompt, "File Label: Optional unique label identifier for this CSF file (e.g. ENG, SPA, FRE, GUI).");
-            ToolTipHelper.SetToolTip(_toolTip, txtTag, "File Label: Optional unique label identifier for this CSF file (e.g. ENG, SPA, FRE, GUI). If left blank, an automatic placeholder label like CSF_01 is assigned.");
-            ToolTipHelper.SetToolTip(_toolTip, btnBrowse, "Browse File: Select and load an existing Command & Conquer .CSF file from your hard drive into this slot.");
-            ToolTipHelper.SetToolTip(_toolTip, btnRemove, "Remove Slot: Remove this file slot card from the active session workspace.");
+            ToolTipHelper.SetToolTip(_toolTip, radioBase, LanguageManager.GetString("ToolTip.SessionManager.RadioBase", "Set Primary CSF: Designate this file as the Primary CSF reference. Other files will copy values and sync missing keys from this primary file."));
+            ToolTipHelper.SetToolTip(_toolTip, lblTagPrompt, LanguageManager.GetString("ToolTip.SessionManager.TagPrompt", "File Label: Optional unique label identifier for this CSF file (e.g. ENG, SPA, FRE, GUI)."));
+            ToolTipHelper.SetToolTip(_toolTip, txtTag, LanguageManager.GetString("ToolTip.SessionManager.TxtTag", "File Label: Optional unique label identifier for this CSF file (e.g. ENG, SPA, FRE, GUI). If left blank, an automatic placeholder label like CSF_01 is assigned."));
+            ToolTipHelper.SetToolTip(_toolTip, btnBrowse, LanguageManager.GetString("ToolTip.SessionManager.BtnBrowse", "Browse File: Select and load an existing Command & Conquer .CSF file from your hard drive into this slot."));
+            ToolTipHelper.SetToolTip(_toolTip, btnRemove, LanguageManager.GetString("ToolTip.SessionManager.BtnRemove", "Remove Slot: Remove this file slot card from the active session workspace."));
             ToolTipHelper.SetToolTip(_toolTip, lblPath, fullPathDisplay);
-            ToolTipHelper.SetToolTip(_toolTip, lblKeys, "Total Keys Count: Total number of string key entries currently contained inside this .CSF file.");
-            ToolTipHelper.SetToolTip(_toolTip, lblDetectedLang, "Binary Language ID: The internal binary language DWORD detected in byte offset 0x14 of the CSF file header.");
-            ToolTipHelper.SetToolTip(_toolTip, lblTranslationLanguage, "Translation content language used when this CSF has LanguageNeutral in its binary header.");
-            ToolTipHelper.SetToolTip(_toolTip, cboTranslationLanguage, "Content language for translation. This does not change the CSF binary Language ID.");
-            ToolTipHelper.SetToolTip(_toolTip, lblError, "Duplicate Label Alert: Every file in a multi-CSF session must have a unique label tag name.");
+            ToolTipHelper.SetToolTip(_toolTip, lblKeys, LanguageManager.GetString("ToolTip.SessionManager.TotalKeys", "Total Keys Count: Total number of string key entries currently contained inside this .CSF file."));
+            ToolTipHelper.SetToolTip(_toolTip, lblDetectedLang, LanguageManager.GetString("ToolTip.SessionManager.BinaryLangId", "Binary Language ID: The internal binary language DWORD detected in byte offset 0x14 of the CSF file header."));
+            ToolTipHelper.SetToolTip(_toolTip, lblTranslationLanguage, LanguageManager.GetString("ToolTip.SessionManager.TranslationContentLang", "Translation content language used when this CSF has LanguageNeutral in its binary header."));
+            ToolTipHelper.SetToolTip(_toolTip, cboTranslationLanguage, LanguageManager.GetString("ToolTip.SessionManager.CboTranslationLang", "Content language for translation. This does not change the CSF binary Language ID."));
+            ToolTipHelper.SetToolTip(_toolTip, lblError, LanguageManager.GetString("ToolTip.SessionManager.DuplicateLabelError", "Duplicate Label Alert: Every file in a multi-CSF session must have a unique label tag name."));
 
             card.Controls.Add(radioBase);
             card.Controls.Add(lblTagPrompt);
@@ -574,7 +579,7 @@ namespace CsfStudio.UI
                 {
                     item.CardPanel.BackColor = Color.FromArgb(255, 235, 235);
                     item.TagTextBox.BackColor = Color.Pink;
-                    item.ErrorLabel.Text = "⚠️ Duplicate Label!";
+                    item.ErrorLabel.Text = LanguageManager.GetString("SessionManager.DuplicateLabelError", "⚠️ Duplicate Label!");
                     item.ErrorLabel.Visible = true;
                     isValid = false;
                 }
@@ -609,8 +614,11 @@ namespace CsfStudio.UI
         {
             if (!ValidateUniqueLanguageTags())
             {
-                MessageBox.Show("Cannot open session: All specified File Labels must be UNIQUE.",
-                    "Duplicate File Label Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.DuplicateFileLabelWarning", "Cannot open session: All specified File Labels must be UNIQUE."),
+                    LanguageManager.GetString("Title.DuplicateFileLabelWarning", "Duplicate File Label Warning"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
                 this.DialogResult = DialogResult.None;
                 return;
             }

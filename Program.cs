@@ -6,7 +6,7 @@ namespace CsfStudio
 {
     public static class AppInfo
     {
-        public const string Version = "1.0.1";
+        public const string Version = "1.5.0";
         public const string Title = "CSF Studio";
         public static string FullVersion => $"v{Version}";
         public static string WindowTitle => $"{Title} v{Version} (Another C&C CSF String Table Editor)";
@@ -34,6 +34,9 @@ namespace CsfStudio
                     }
                 }
             }
+
+            var config = CsfStudio.Core.ConfigManager.LoadConfig();
+            CsfStudio.Core.LanguageManager.Initialize(config.UiLanguage);
 
             Application.Run(new MainForm(initialFiles));
         }

@@ -126,8 +126,6 @@ namespace CsfStudio.UI
             this.pnlCoverageHeader = new System.Windows.Forms.Panel();
             this.gridCoverage = new System.Windows.Forms.DataGridView();
             this.colCovKey = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.colCovCat = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.colCovBaseText = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.colCovStatus = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.colCovPercent = new System.Windows.Forms.DataGridViewTextBoxColumn();
             this.menuStrip1.SuspendLayout();
@@ -317,7 +315,7 @@ namespace CsfStudio.UI
             // menuUndo
             // 
             this.menuUndo.Name = "menuUndo";
-            this.menuUndo.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Z)));
+            this.menuUndo.ShortcutKeyDisplayString = "Ctrl+Z";
             this.menuUndo.Size = new System.Drawing.Size(235, 22);
             this.menuUndo.Text = "↩️ &Undo";
             this.menuUndo.Click += new System.EventHandler(this.menuUndo_Click);
@@ -325,7 +323,7 @@ namespace CsfStudio.UI
             // menuRedo
             // 
             this.menuRedo.Name = "menuRedo";
-            this.menuRedo.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Y)));
+            this.menuRedo.ShortcutKeyDisplayString = "Ctrl+Y";
             this.menuRedo.Size = new System.Drawing.Size(235, 22);
             this.menuRedo.Text = "↪️ &Redo";
             this.menuRedo.Click += new System.EventHandler(this.menuRedo_Click);
@@ -338,7 +336,7 @@ namespace CsfStudio.UI
             // menuCut
             // 
             this.menuCut.Name = "menuCut";
-            this.menuCut.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.X)));
+            this.menuCut.ShortcutKeyDisplayString = "Ctrl+X";
             this.menuCut.Size = new System.Drawing.Size(235, 22);
             this.menuCut.Text = "✂️ Cu&t";
             this.menuCut.Click += new System.EventHandler(this.menuCut_Click);
@@ -346,7 +344,7 @@ namespace CsfStudio.UI
             // menuCopy
             // 
             this.menuCopy.Name = "menuCopy";
-            this.menuCopy.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.C)));
+            this.menuCopy.ShortcutKeyDisplayString = "Ctrl+C";
             this.menuCopy.Size = new System.Drawing.Size(235, 22);
             this.menuCopy.Text = "📋 &Copy";
             this.menuCopy.Click += new System.EventHandler(this.menuCopy_Click);
@@ -354,7 +352,7 @@ namespace CsfStudio.UI
             // menuPaste
             // 
             this.menuPaste.Name = "menuPaste";
-            this.menuPaste.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.V)));
+            this.menuPaste.ShortcutKeyDisplayString = "Ctrl+V";
             this.menuPaste.Size = new System.Drawing.Size(235, 22);
             this.menuPaste.Text = "📋 &Paste";
             this.menuPaste.Click += new System.EventHandler(this.menuPaste_Click);
@@ -362,7 +360,7 @@ namespace CsfStudio.UI
             // menuSelectAll
             // 
             this.menuSelectAll.Name = "menuSelectAll";
-            this.menuSelectAll.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.A)));
+            this.menuSelectAll.ShortcutKeyDisplayString = "Ctrl+A";
             this.menuSelectAll.Size = new System.Drawing.Size(260, 22);
             this.menuSelectAll.Text = "☑️ Select &All";
             this.menuSelectAll.Click += new System.EventHandler(this.menuSelectAll_Click);
@@ -1121,8 +1119,6 @@ namespace CsfStudio.UI
             this.gridCoverage.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
             this.gridCoverage.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
             this.colCovKey,
-            this.colCovCat,
-            this.colCovBaseText,
             this.colCovStatus,
             this.colCovPercent});
             this.gridCoverage.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -1142,18 +1138,6 @@ namespace CsfStudio.UI
             this.colCovKey.MinimumWidth = 220;
             this.colCovKey.Name = "colCovKey";
             this.colCovKey.ReadOnly = true;
-            // 
-            // colCovCat
-            // 
-            this.colCovCat.HeaderText = "Category";
-            this.colCovCat.Name = "colCovCat";
-            this.colCovCat.ReadOnly = true;
-            // 
-            // colCovBaseText
-            // 
-            this.colCovBaseText.HeaderText = "Main CSF Text";
-            this.colCovBaseText.Name = "colCovBaseText";
-            this.colCovBaseText.ReadOnly = true;
             // 
             // colCovStatus
             // 
@@ -1315,8 +1299,6 @@ namespace CsfStudio.UI
         private System.Windows.Forms.Panel pnlCoverageHeader;
         private System.Windows.Forms.DataGridView gridCoverage;
         private System.Windows.Forms.DataGridViewTextBoxColumn colCovKey;
-        private System.Windows.Forms.DataGridViewTextBoxColumn colCovCat;
-        private System.Windows.Forms.DataGridViewTextBoxColumn colCovBaseText;
         private System.Windows.Forms.DataGridViewTextBoxColumn colCovStatus;
         private System.Windows.Forms.DataGridViewTextBoxColumn colCovPercent;
         private System.Windows.Forms.TabPage tabBackups;

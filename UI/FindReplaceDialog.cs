@@ -22,21 +22,39 @@ namespace CsfStudio.UI
         public FindReplaceDialog()
         {
             InitializeComponent();
+            ApplyLocalization();
             _config = ConfigManager.LoadConfig();
 
-            ToolTipHelper.SetToolTip(cboFind, "Enter search pattern or text to locate.");
-            ToolTipHelper.SetToolTip(cboReplace, "Enter replacement text for matching items.");
-            ToolTipHelper.SetToolTip(chkMatchCase, "Enforce strict uppercase and lowercase matching.");
-            ToolTipHelper.SetToolTip(chkUseRegex, "Enables standard .NET Regular Expression pattern matching.\n\nFormat Examples:\n• ^GUI_.* : Matches keys starting with GUI_\n• \\b(Unit|Building)\\b : Matches exact words\n• Replace with $1 : Uses capture groups\n\nClick (Online Help) for complete documentation.");
-            ToolTipHelper.SetToolTip(lnkRegexHelp, "Open Microsoft .NET Regular Expressions documentation in web browser.");
-            ToolTipHelper.SetToolTip(chkSearchKey, "Search inside label key names.");
-            ToolTipHelper.SetToolTip(chkSearchValue, "Search inside label string values.");
-            ToolTipHelper.SetToolTip(btnFindNext, "Find the next matching string entry.");
-            ToolTipHelper.SetToolTip(btnReplace, "Replace current match and advance to next.");
-            ToolTipHelper.SetToolTip(btnReplaceAll, "Replace all matching occurrences across the document.");
+            ToolTipHelper.SetToolTip(cboFind, LanguageManager.GetString("ToolTip.FindReplace.Find", "Enter search pattern or text to locate."));
+            ToolTipHelper.SetToolTip(cboReplace, LanguageManager.GetString("ToolTip.FindReplace.Replace", "Enter replacement text for matching items."));
+            ToolTipHelper.SetToolTip(chkMatchCase, LanguageManager.GetString("ToolTip.FindReplace.MatchCase", "Enforce strict uppercase and lowercase matching."));
+            ToolTipHelper.SetToolTip(chkUseRegex, LanguageManager.GetString("ToolTip.FindReplace.UseRegex", "Enables standard .NET Regular Expression pattern matching.\n\nFormat Examples:\n• ^GUI_.* : Matches keys starting with GUI_\n• \\b(Unit|Building)\\b : Matches exact words\n• Replace with $1 : Uses capture groups\n\nClick (Online Help) for complete documentation."));
+            ToolTipHelper.SetToolTip(lnkRegexHelp, LanguageManager.GetString("ToolTip.FindReplace.RegexHelp", "Open Microsoft .NET Regular Expressions documentation in web browser."));
+            ToolTipHelper.SetToolTip(chkSearchKey, LanguageManager.GetString("ToolTip.FindReplace.SearchKey", "Search inside label key names."));
+            ToolTipHelper.SetToolTip(chkSearchValue, LanguageManager.GetString("ToolTip.FindReplace.SearchValue", "Search inside label string values."));
+            ToolTipHelper.SetToolTip(btnFindNext, LanguageManager.GetString("ToolTip.FindReplace.FindNext", "Find the next matching string entry."));
+            ToolTipHelper.SetToolTip(btnReplace, LanguageManager.GetString("ToolTip.FindReplace.BtnReplace", "Replace current match and advance to next."));
+            ToolTipHelper.SetToolTip(btnReplaceAll, LanguageManager.GetString("ToolTip.FindReplace.BtnReplaceAll", "Replace all matching occurrences across the document."));
 
             LoadConfigToUI();
             chkUseRegex.CheckedChanged += ChkUseRegex_CheckedChanged;
+        }
+
+        private void ApplyLocalization()
+        {
+            this.Text = LanguageManager.GetString("FindReplace.Title", "Find and Replace");
+            if (lblFind != null) lblFind.Text = LanguageManager.GetString("FindReplace.FindText", "Find text:");
+            if (lblReplace != null) lblReplace.Text = LanguageManager.GetString("FindReplace.ReplaceWith", "Replace with:");
+            if (chkMatchCase != null) chkMatchCase.Text = LanguageManager.GetString("FindReplace.MatchCase", "Match case");
+            if (chkUseRegex != null) chkUseRegex.Text = LanguageManager.GetString("FindReplace.UseRegex", "Use RegEx");
+            if (lnkRegexHelp != null) lnkRegexHelp.Text = LanguageManager.GetString("FindReplace.OnlineHelp", "(Online Help)");
+            if (grpScope != null) grpScope.Text = LanguageManager.GetString("FindReplace.SearchScope", "Search Scope");
+            if (chkSearchKey != null) chkSearchKey.Text = LanguageManager.GetString("FindReplace.SearchKey", "Label (Key)");
+            if (chkSearchValue != null) chkSearchValue.Text = LanguageManager.GetString("FindReplace.SearchValue", "Text Value");
+            if (btnFindNext != null) btnFindNext.Text = LanguageManager.GetString("FindReplace.FindNext", "Find Next");
+            if (btnReplace != null) btnReplace.Text = LanguageManager.GetString("FindReplace.Replace", "Replace");
+            if (btnReplaceAll != null) btnReplaceAll.Text = LanguageManager.GetString("FindReplace.ReplaceAll", "Replace All");
+            if (btnClose != null) btnClose.Text = LanguageManager.GetString("Button.Close", "Close");
         }
 
         private void LoadConfigToUI()
@@ -103,7 +121,11 @@ namespace CsfStudio.UI
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Unable to open web browser:\n{ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Msg.UnableToOpenWebBrowserFormat", "Unable to open web browser:\n{0}"), ex.Message),
+                    LanguageManager.GetString("Title.Error", "Error"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
         }
 

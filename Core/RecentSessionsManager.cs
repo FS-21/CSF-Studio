@@ -57,14 +57,29 @@ namespace CsfStudio.Core
 
     public static class RecentSessionsManager
     {
-        private static readonly string AppDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CSFStudio");
-        private static readonly string ConfigFilePath = Path.Combine(AppDataFolder, "recent_sessions.xml");
+        private static readonly string ConfigFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "recent_sessions.xml");
+        private static readonly string LegacyAppDataFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "CSFStudio");
+        private static readonly string LegacyConfigFilePath = Path.Combine(LegacyAppDataFolder, "recent_sessions.xml");
         private static readonly XmlSerializer Serializer = new XmlSerializer(typeof(List<RecentSessionItem>));
 
         public static List<RecentSessionItem> GetRecentSessions()
         {
             try
             {
+                if (!File.Exists(ConfigFilePath) && File.Exists(LegacyConfigFilePath))
+                {
+                    try
+                    {
+                        File.Copy(LegacyConfigFilePath, ConfigFilePath, true);
+                        File.Delete(LegacyConfigFilePath);
+                        if (Directory.Exists(LegacyAppDataFolder) && Directory.GetFileSystemEntries(LegacyAppDataFolder).Length == 0)
+                        {
+                            Directory.Delete(LegacyAppDataFolder);
+                        }
+                    }
+                    catch { }
+                }
+
                 if (!File.Exists(ConfigFilePath)) return new List<RecentSessionItem>();
                 using (var stream = File.OpenRead(ConfigFilePath))
                 {
@@ -124,18 +139,25 @@ namespace CsfStudio.Core
 
             try
             {
-                if (!Directory.Exists(AppDataFolder))
-                {
-                    Directory.CreateDirectory(AppDataFolder);
-                }
-
                 var currentRecent = GetRecentSessions();
 
-                var validFiles = session.Documents.Select((d, idx) => new SavedCsfFileInfo
+                var validFiles = session.Documents.Select((d, idx) =>
                 {
-                    LanguageTag = CsfSessionDocument.ResolveLanguageTag(d.LanguageTag, d.Document, idx),
-                    TranslationContentLanguage = d.TranslationContentLanguage ?? string.Empty,
-                    FilePath = d.FilePath
+                    string transLang = d.TranslationContentLanguage ?? string.Empty;
+                    if (string.IsNullOrEmpty(transLang) && !string.IsNullOrEmpty(d.FilePath))
+                    {
+                        var existingFile = currentRecent.SelectMany(r => r.Files).FirstOrDefault(f => string.Equals(f.FilePath, d.FilePath, StringComparison.OrdinalIgnoreCase));
+                        if (existingFile != null && !string.IsNullOrEmpty(existingFile.TranslationContentLanguage))
+                        {
+                            transLang = existingFile.TranslationContentLanguage;
+                        }
+                    }
+                    return new SavedCsfFileInfo
+                    {
+                        LanguageTag = CsfSessionDocument.ResolveLanguageTag(d.LanguageTag, d.Document, idx),
+                        TranslationContentLanguage = transLang,
+                        FilePath = d.FilePath
+                    };
                 }).Where(f => !string.IsNullOrEmpty(f.FilePath) && File.Exists(f.FilePath)).ToList();
 
                 if (validFiles.Count == 0) return;
@@ -188,6 +210,10 @@ namespace CsfStudio.Core
                 if (File.Exists(ConfigFilePath))
                 {
                     File.Delete(ConfigFilePath);
+                }
+                if (File.Exists(LegacyConfigFilePath))
+                {
+                    try { File.Delete(LegacyConfigFilePath); } catch { }
                 }
             }
             catch { }

@@ -3,6 +3,7 @@ using System.Drawing;
 using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
+using CsfStudio.Core;
 
 namespace CsfStudio.UI
 {
@@ -15,7 +16,7 @@ namespace CsfStudio.UI
 
         private void InitializeComponent()
         {
-            this.Text = "ℹ️ About CSF Studio";
+            this.Text = LanguageManager.GetString("About.Title", "ℹ️ About CSF Studio");
             this.Size = new Size(480, 360);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterParent;
@@ -96,7 +97,7 @@ namespace CsfStudio.UI
 
             var lblVersion = new Label
             {
-                Text = $"Version {AppInfo.Version}",
+                Text = string.Format(LanguageManager.GetString("About.VersionFormat", "Version {0}"), AppInfo.Version),
                 Location = new Point(95, 48),
                 Size = new Size(350, 20),
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
@@ -105,7 +106,7 @@ namespace CsfStudio.UI
 
             var lblSubtitle = new Label
             {
-                Text = "Created by FS-21",
+                Text = LanguageManager.GetString("About.CreatedBy", "Created by FS-21"),
                 Location = new Point(95, 68),
                 Size = new Size(350, 20),
                 Font = new Font("Segoe UI", 8.5F, FontStyle.Italic),
@@ -129,7 +130,8 @@ namespace CsfStudio.UI
                 Size = new Size(425, 150),
                 Font = new Font("Segoe UI", 9F, FontStyle.Regular),
                 BackColor = SystemColors.ControlLightLight,
-                Text = "CSF Studio is a specialized multi-file string table (.CSF) editor created via Live-Coding & AI Pair-Programming, designed for Command & Conquer: Red Alert 2 and Yuri's Revenge modding and localization.\r\n\r\n" +
+                Text = LanguageManager.GetString("About.Description",
+                       "CSF Studio is a specialized multi-file string table (.CSF) editor created via Live-Coding & AI Pair-Programming, designed for Command & Conquer: Red Alert 2 and Yuri's Revenge modding and localization.\r\n\r\n" +
                        "Key Features:\r\n" +
                        " • Simultaneous Multi-CSF Sessions & Drag & Drop (.csf & .txt import)\r\n" +
                        " • Key and/or Value search & filtering with Regular Expressions (RegEx)\r\n" +
@@ -144,12 +146,12 @@ namespace CsfStudio.UI
                        "Disclaimer:\r\n" +
                        " • Provided 'AS IS' without warranty of any kind. Always backup your original .CSF files before editing. Use at your own risk.\r\n\r\n" +
                        "Author:\r\n" +
-                       " • FS-21"
+                       " • FS-21")
             };
 
             var btnOK = new Button
             {
-                Text = "OK",
+                Text = LanguageManager.GetString("Button.OK", "OK"),
                 DialogResult = DialogResult.OK,
                 Location = new Point(360, 278),
                 Size = new Size(85, 28),

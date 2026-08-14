@@ -123,8 +123,8 @@ namespace CsfStudio.UI
             };
 
             progressBar = new ProgressBar { Location = new Point(15, 13), Size = new Size(500, 20), Visible = false };
-            lblStatus = new Label { Text = "Ready to translate.", Location = new Point(15, 14), Size = new Size(500, 22), ForeColor = Color.DimGray, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Regular) };
-            btnClose = new Button { Text = "Close", Location = new Point(535, 8), Size = new Size(95, 30), DialogResult = DialogResult.Cancel, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Regular) };
+            lblStatus = new Label { Text = LanguageManager.GetString("Translation.StatusReady", "Ready to translate."), Location = new Point(15, 14), Size = new Size(500, 22), ForeColor = Color.DimGray, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Regular) };
+            btnClose = new Button { Text = LanguageManager.GetString("Button.Close", "Close"), Location = new Point(535, 8), Size = new Size(95, 30), DialogResult = DialogResult.Cancel, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Regular) };
 
             pnlFooter.Controls.Add(progressBar);
             pnlFooter.Controls.Add(lblStatus);
@@ -135,57 +135,34 @@ namespace CsfStudio.UI
 
             int yOffset = 15;
 
-            var lblSource = new Label { Text = "📄 Source CSF Document:", Location = new Point(20, yOffset + 3), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
+            var lblSource = new Label { Text = LanguageManager.GetString("Translation.SourceCsf", "📄 Source CSF Document:"), Location = new Point(20, yOffset + 3), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
             cboSourceCsf = new ComboBox { Location = new Point(240, yOffset), Size = new Size(380, 23), DropDownStyle = ComboBoxStyle.DropDownList };
 
             yOffset += 36;
-            var lblSourceLang = new Label { Text = "🌐 Source Language:", Location = new Point(20, yOffset + 3), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
+            var lblSourceLang = new Label { Text = LanguageManager.GetString("Translation.SourceLang", "🌐 Source Language:"), Location = new Point(20, yOffset + 3), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
             cboSourceLang = new ComboBox { Location = new Point(240, yOffset), Size = new Size(380, 23), DropDownStyle = ComboBoxStyle.DropDown };
 
-            cboSourceLang.Items.AddRange(new object[] {
-                "Auto Detect [auto]",
-                "English (US) [en]",
-                "French [fr]",
-                "German [de]",
-                "Spanish [es]",
-                "Italian [it]",
-                "Russian [ru]",
-                "Polish [pl]",
-                "Japanese [ja]",
-                "Korean [ko]",
-                "Traditional Chinese [zh-Hant]",
-                "Simplified Chinese [zh-Hans]"
-            });
+            var srcLangs = new List<object> { LanguageManager.GetString("LangName.AutoDetect", "Auto Detect [auto]") };
+            srcLangs.AddRange(CsfStudio.Core.Translation.TranslationLanguageHelper.GetLanguageOptions().Cast<object>());
+            cboSourceLang.Items.AddRange(srcLangs.ToArray());
 
             yOffset += 36;
-            var lblTargetFile = new Label { Text = "🎯 Target CSF Document:", Location = new Point(20, yOffset + 3), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
+            var lblTargetFile = new Label { Text = LanguageManager.GetString("Translation.TargetCsf", "🎯 Target CSF Document:"), Location = new Point(20, yOffset + 3), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
             cboTargetCsf = new ComboBox { Location = new Point(240, yOffset), Size = new Size(380, 23), DropDownStyle = ComboBoxStyle.DropDownList };
 
             yOffset += 36;
-            var lblTargetLang = new Label { Text = "🌐 Target Language:", Location = new Point(20, yOffset + 3), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
+            var lblTargetLang = new Label { Text = LanguageManager.GetString("Translation.TargetLang", "🌐 Target Language:"), Location = new Point(20, yOffset + 3), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold) };
             cboTargetLang = new ComboBox { Location = new Point(240, yOffset), Size = new Size(380, 23), DropDownStyle = ComboBoxStyle.DropDown };
 
-            cboTargetLang.Items.AddRange(new object[] {
-                "English (US) [en]",
-                "French [fr]",
-                "German [de]",
-                "Spanish [es]",
-                "Italian [it]",
-                "Russian [ru]",
-                "Polish [pl]",
-                "Japanese [ja]",
-                "Korean [ko]",
-                "Traditional Chinese [zh-Hant]",
-                "Simplified Chinese [zh-Hans]"
-            });
+            cboTargetLang.Items.AddRange(CsfStudio.Core.Translation.TranslationLanguageHelper.GetLanguageOptions().Cast<object>().ToArray());
 
             yOffset += 36;
-            lblModel = new Label { Text = "🤖 AI Model Selection:", Location = new Point(20, yOffset + 3), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold), Visible = isAiModel };
+            lblModel = new Label { Text = LanguageManager.GetString("Translation.AiModel", "🤖 AI Model Selection:"), Location = new Point(20, yOffset + 3), AutoSize = true, Font = new Font(FontFamily.GenericSansSerif, 8.5f, FontStyle.Bold), Visible = isAiModel };
             cboModelOverride = new ComboBox { Location = new Point(240, yOffset), Size = new Size(250, 23), DropDownStyle = ComboBoxStyle.DropDown, Text = _serviceConfig?.Model ?? "", Visible = isAiModel };
 
             btnFetchModels = new Button
             {
-                Text = "🔄 Fetch Models",
+                Text = LanguageManager.GetString("Translation.FetchModels", "🔄 Fetch Models"),
                 Location = new Point(500, yOffset - 1),
                 Size = new Size(120, 25),
                 Font = new Font(FontFamily.GenericSansSerif, 8f, FontStyle.Bold),
@@ -198,12 +175,12 @@ namespace CsfStudio.UI
             int btnY2 = btnY1 + 42;
 
             string btnAllText = hasSelection
-                ? $"⚡ Translate {selCount} Selected Keys (Create in Target if missing)"
-                : "⚡ Translate ALL keys from Source CSF";
+                ? string.Format(LanguageManager.GetString("Translation.TranslateSelectionAll", "⚡ Translate {0} Selected Keys (Create in Target if missing)"), selCount)
+                : LanguageManager.GetString("Translation.TranslateAllKeys", "⚡ Translate ALL keys from Source CSF");
 
             string btnExistText = hasSelection
-                ? $"✏️ Translate {selCount} Selected Keys (Only if existing in Target)"
-                : "✏️ Translate ONLY EXISTING keys in Target CSF";
+                ? string.Format(LanguageManager.GetString("Translation.TranslateSelectionExisting", "✏️ Translate {0} Selected Keys (Only if existing in Target)"), selCount)
+                : LanguageManager.GetString("Translation.TranslateExistingKeys", "✏️ Translate ONLY EXISTING keys in Target CSF");
 
             btnTranslateAll = new Button
             {
@@ -296,7 +273,7 @@ namespace CsfStudio.UI
             if (_serviceConfig == null || string.IsNullOrWhiteSpace(_serviceConfig.Endpoint)) return;
 
             btnFetchModels.Enabled = false;
-            btnFetchModels.Text = "⏳ Fetching...";
+            btnFetchModels.Text = LanguageManager.GetString("TranslationService.FetchingModels", "⏳ Fetching...");
 
             try
             {
@@ -318,25 +295,37 @@ namespace CsfStudio.UI
 
                     if (showSuccessMsg)
                     {
-                        MessageBox.Show($"✅ Discovered {models.Count} active models from provider server!", "Models Discovered", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        MessageBox.Show(
+                            string.Format(LanguageManager.GetString("Msg.DiscoveredModelsSuccessFormat", "✅ Discovered {0} active models from provider server!"), models.Count),
+                            LanguageManager.GetString("Title.ModelsDiscovered", "Models Discovered"),
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
                     }
                 }
                 else if (showSuccessMsg)
                 {
-                    MessageBox.Show("No models were returned by the server /v1/models endpoint.", "Fetch Models", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show(
+                        LanguageManager.GetString("Msg.NoModelsReturned", "No models were returned by the server /v1/models endpoint."),
+                        LanguageManager.GetString("Title.FetchModels", "Fetch Models"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
                 }
             }
             catch (Exception ex)
             {
                 if (showSuccessMsg)
                 {
-                    MessageBox.Show($"❌ Error fetching models from provider endpoint:\n\n{ex.Message}", "Fetch Models Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show(
+                        string.Format(LanguageManager.GetString("Msg.ErrorFetchingModelsFormat", "❌ Error fetching models from provider endpoint:\n\n{0}"), ex.Message),
+                        LanguageManager.GetString("Title.FetchModelsError", "Fetch Models Error"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
                 }
             }
             finally
             {
                 btnFetchModels.Enabled = true;
-                btnFetchModels.Text = "🔄 Fetch Models";
+                btnFetchModels.Text = LanguageManager.GetString("Translation.FetchModels", "🔄 Fetch Models");
             }
         }
 
@@ -410,7 +399,11 @@ namespace CsfStudio.UI
             var targetDoc = cboTargetCsf.SelectedItem as CsfSessionDocument;
             if (sourceDoc == null || targetDoc == null || _session == null || _session.Documents.Count == 0)
             {
-                MessageBox.Show("Please select valid source and target CSF documents.", "Translation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.SelectValidSourceTargetDocs", "Please select valid source and target CSF documents."),
+                    LanguageManager.GetString("Title.Translation", "Translation"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
                 return;
             }
 
@@ -457,24 +450,23 @@ namespace CsfStudio.UI
             int selCount = hasSelection ? _selectedKeysFilter.Count : 0;
 
             string scopeDescription = hasSelection
-                ? $"{selCount} Selected Entries Only"
-                : (translateAll ? "ALL keys from selected Source CSF" : "ONLY EXISTING keys in Target CSF");
+                ? string.Format(LanguageManager.GetString("Translation.ScopeSelectedOnlyFormat", "{0} Selected Entries Only"), selCount)
+                : (translateAll ? LanguageManager.GetString("Translation.ScopeAllKeys", "ALL keys from selected Source CSF") : LanguageManager.GetString("Translation.ScopeExistingOnly", "ONLY EXISTING keys in Target CSF"));
 
             string actionDescription = translateAll
-                ? (hasSelection ? $"Translate {selCount} selected keys (Add to Target if missing)" : "ALL keys from selected Source CSF")
-                : (hasSelection ? $"Translate {selCount} selected keys (Only if existing in Target)" : "ONLY EXISTING keys in Target CSF");
+                ? (hasSelection ? string.Format(LanguageManager.GetString("Translation.ActionTranslateSelectionAllFormat", "Translate {0} selected keys (Add to Target if missing)"), selCount) : LanguageManager.GetString("Translation.ScopeAllKeys", "ALL keys from selected Source CSF"))
+                : (hasSelection ? string.Format(LanguageManager.GetString("Translation.ActionTranslateSelectionExistingFormat", "Translate {0} selected keys (Only if existing in Target)"), selCount) : LanguageManager.GetString("Translation.ScopeExistingOnly", "ONLY EXISTING keys in Target CSF"));
 
             string modelInfo = cboModelOverride.Visible ? $"· Model Selected: {_serviceConfig.Model}\n" : "";
-            string confirmMsg = $"Do you want to proceed with translation using '{_serviceConfig.DisplayName}'?\n\n" +
-                               $"· Source CSF: {sourceDoc.FileName}\n" +
-                               $"· Target CSF: {targetDoc.FileName}\n" +
-                               $"· Scope: {scopeDescription}\n" +
-                               $"· Action: {actionDescription}\n" +
-                               $"· Source Language: {sourceLanguage}\n" +
-                               $"· Target Language: {targetLanguage}\n" +
-                               modelInfo;
+            string confirmMsg = string.Format(
+                LanguageManager.GetString("Msg.ConfirmTranslationFormat", "Do you want to proceed with translation using '{0}'?\n\n· Source CSF: {1}\n· Target CSF: {2}\n· Scope: {3}\n· Action: {4}\n· Source Language: {5}\n· Target Language: {6}\n{7}"),
+                _serviceConfig.DisplayName, sourceDoc.FileName, targetDoc.FileName, scopeDescription, actionDescription, sourceLanguage, targetLanguage, modelInfo);
 
-            if (MessageBox.Show(confirmMsg, "Confirm Translation", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            if (MessageBox.Show(
+                confirmMsg,
+                LanguageManager.GetString("Title.ConfirmTranslation", "Confirm Translation"),
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question) != DialogResult.Yes)
             {
                 return;
             }
@@ -483,7 +475,7 @@ namespace CsfStudio.UI
             btnTranslateExistingOnly.Enabled = false;
             progressBar.Visible = true;
             progressBar.Value = 0;
-            lblStatus.Text = "Preparing keys for translation...";
+            lblStatus.Text = LanguageManager.GetString("Translation.PreparingKeys", "Preparing keys for translation...");
 
             _cts = new CancellationTokenSource();
             var provider = TranslationProviderFactory.CreateProvider(_serviceConfig);
@@ -516,7 +508,11 @@ namespace CsfStudio.UI
 
             if (itemsToTranslate.Count == 0)
             {
-                MessageBox.Show("No eligible keys found for translation in the selected scope.", "Translation", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.NoEligibleKeysToTranslate", "No eligible keys found for translation in the selected scope."),
+                    LanguageManager.GetString("Title.Translation", "Translation"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
                 btnTranslateAll.Enabled = true;
                 btnTranslateExistingOnly.Enabled = true;
                 progressBar.Visible = false;
@@ -535,7 +531,7 @@ namespace CsfStudio.UI
                         this.BeginInvoke((Action)(() =>
                         {
                             progressBar.Value = (int)((double)processed / total * 100);
-                            lblStatus.Text = $"Translating... ({processed} / {total} keys)";
+                            lblStatus.Text = string.Format(LanguageManager.GetString("Translation.ProgressFormat", "Translating... ({0} / {1} keys)"), processed, total);
                         }));
                     },
                     _cts.Token
@@ -545,7 +541,11 @@ namespace CsfStudio.UI
                 {
                     int translatedCount = 0;
                     var updatedKeys = new List<string>();
-                    var batchUndo = new BatchUndoCommand($"Translate {itemsToTranslate.Count} keys ({sourceLanguage}->{targetLanguage})");
+                    var batchUndo = new BatchUndoCommand(string.Format(
+                        LanguageManager.GetString("Undo.TranslateKeys", "Translate {0} keys ({1}->{2})"),
+                        itemsToTranslate.Count,
+                        sourceLanguage,
+                        targetLanguage));
 
                     foreach (var item in itemsToTranslate)
                     {
@@ -594,27 +594,39 @@ namespace CsfStudio.UI
                         TranslationCompleted?.Invoke(updatedKeys);
                     }
 
-                    lblStatus.Text = $"✅ Translation completed successfully! ({translatedCount} keys updated)";
+                    lblStatus.Text = string.Format(LanguageManager.GetString("Translation.CompletedStatusFormat", "✅ Translation completed successfully! ({0} keys updated)"), translatedCount);
                     lblStatus.ForeColor = Color.DarkGreen;
-                    MessageBox.Show($"✅ Translation completed successfully!\n\nUpdated: {translatedCount} keys in {targetDoc.FileName}", "Translation Finished", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show(
+                        string.Format(LanguageManager.GetString("Msg.TranslationSuccessFormat", "✅ Translation completed successfully!\n\nUpdated: {0} keys in {1}"), translatedCount, targetDoc.FileName),
+                        LanguageManager.GetString("Title.TranslationFinished", "Translation Finished"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
                 }
                 else
                 {
-                    lblStatus.Text = $"❌ Translation stopped: {result.ErrorMessage}";
+                    lblStatus.Text = string.Format(LanguageManager.GetString("Translation.StoppedStatusFormat", "❌ Translation stopped: {0}"), result.ErrorMessage);
                     lblStatus.ForeColor = Color.Red;
-                    MessageBox.Show($"❌ Translation stopped:\n\n{result.ErrorMessage}", "Translation Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    MessageBox.Show(
+                        string.Format(LanguageManager.GetString("Msg.TranslationStoppedFormat", "❌ Translation stopped:\n\n{0}"), result.ErrorMessage),
+                        LanguageManager.GetString("Title.TranslationError", "Translation Error"),
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
                 }
             }
             catch (OperationCanceledException)
             {
-                lblStatus.Text = "Translation canceled by user.";
+                lblStatus.Text = LanguageManager.GetString("Translation.CancelledStatus", "Translation canceled by user.");
                 lblStatus.ForeColor = Color.OrangeRed;
             }
             catch (Exception ex)
             {
-                lblStatus.Text = "Error during translation: " + ex.Message;
+                lblStatus.Text = LanguageManager.GetString("Translation.ErrorStatusPrefix", "Error during translation: ") + ex.Message;
                 lblStatus.ForeColor = Color.Red;
-                MessageBox.Show("Translation Error: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show(
+                    string.Format(LanguageManager.GetString("Msg.TranslationErrorFormat", "Translation Error: {0}"), ex.Message),
+                    LanguageManager.GetString("Title.Error", "Error"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
             finally
             {

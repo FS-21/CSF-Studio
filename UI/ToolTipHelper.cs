@@ -76,15 +76,35 @@ namespace CsfStudio.UI
             item.ToolTipText = WrapText(caption, maxLineLength);
         }
 
+        public static void SetToolTip(TabPage page, string caption, int maxLineLength = 45)
+        {
+            if (page == null) return;
+            page.ToolTipText = WrapText(caption, maxLineLength);
+        }
+
+        public static void SetToolTip(DataGridViewColumn column, string caption, int maxLineLength = 45)
+        {
+            if (column == null) return;
+            column.ToolTipText = WrapText(caption, maxLineLength);
+        }
+
+        public static void SetToolTip(DataGridViewCell cell, string caption, int maxLineLength = 45)
+        {
+            if (cell == null) return;
+            cell.ToolTipText = WrapText(caption, maxLineLength);
+        }
+
         public static bool CheckAndPromptUnknownLanguage(CsfStudio.Core.CsfDocument doc, string filePath, IWin32Window owner = null)
         {
             if (doc == null || doc.Language != CsfStudio.Core.CsfLanguage.Unknown) return false;
 
-            string fileName = string.IsNullOrEmpty(filePath) ? "CSF Document" : System.IO.Path.GetFileName(filePath);
+            string fileName = string.IsNullOrEmpty(filePath)
+                ? LanguageManager.GetString("Text.CsfDocument", "CSF Document")
+                : System.IO.Path.GetFileName(filePath);
 
             using (var dlg = new Form())
             {
-                dlg.Text = "Unknown Header Language ID Detected";
+                dlg.Text = LanguageManager.GetString("UnknownLang.Title", "Unknown Header Language ID Detected");
                 dlg.Size = new System.Drawing.Size(520, 275);
                 dlg.StartPosition = owner != null ? FormStartPosition.CenterParent : FormStartPosition.CenterScreen;
                 dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -102,7 +122,7 @@ namespace CsfStudio.UI
 
                 var lblMsg = new Label
                 {
-                    Text = $"The loaded file '{fileName}' contains an unrecognized or invalid binary Language ID (Offset 0x14) in its CSF header.\n\nPlease select a valid Language ID to assign to this document:",
+                    Text = string.Format(LanguageManager.GetString("UnknownLang.PromptFormat", "The loaded file '{0}' contains an unrecognized or invalid binary Language ID (Offset 0x14) in its CSF header.\n\nPlease select a valid Language ID to assign to this document:"), fileName),
                     Location = new System.Drawing.Point(65, 15),
                     Size = new System.Drawing.Size(425, 75),
                     Font = new System.Drawing.Font(System.Drawing.FontFamily.GenericSansSerif, 8.5f)
@@ -110,7 +130,7 @@ namespace CsfStudio.UI
 
                 var lblComboPrompt = new Label
                 {
-                    Text = "Header Language ID:",
+                    Text = LanguageManager.GetString("UnknownLang.ComboPrompt", "Header Language ID:"),
                     Location = new System.Drawing.Point(15, 95),
                     AutoSize = true,
                     Font = new System.Drawing.Font(System.Drawing.FontFamily.GenericSansSerif, 8.5f, System.Drawing.FontStyle.Bold)
@@ -130,7 +150,7 @@ namespace CsfStudio.UI
                     if (lang == CsfStudio.Core.CsfLanguage.Unknown) continue;
                     langList.Add(lang);
                     string extraInfo = lang == CsfStudio.Core.CsfLanguage.LanguageNeutral
-                        ? "LanguageNeutral (-1 / 0xFFFFFFFF) [Requires Ares DLL]"
+                        ? LanguageManager.GetString("UnknownLang.LanguageNeutralOption", "LanguageNeutral (-1 / 0xFFFFFFFF) [Requires Ares DLL]")
                         : $"{lang} ({(int)lang})";
                     cmbLang.Items.Add(extraInfo);
                 }
@@ -139,7 +159,7 @@ namespace CsfStudio.UI
 
                 var lblAresNote = new Label
                 {
-                    Text = "Note: 'LanguageNeutral' requires the Ares Engine Expansion DLL in Red Alert 2 / Yuri's Revenge.",
+                    Text = LanguageManager.GetString("UnknownLang.AresNote", "Note: 'LanguageNeutral' requires the Ares Engine Expansion DLL in Red Alert 2 / Yuri's Revenge."),
                     Location = new System.Drawing.Point(65, 128),
                     Size = new System.Drawing.Size(425, 35),
                     Font = new System.Drawing.Font(System.Drawing.FontFamily.GenericSansSerif, 8f, System.Drawing.FontStyle.Italic),
@@ -148,7 +168,7 @@ namespace CsfStudio.UI
 
                 var btnOk = new Button
                 {
-                    Text = "Assign Language",
+                    Text = LanguageManager.GetString("UnknownLang.BtnAssign", "Assign Language"),
                     DialogResult = DialogResult.OK,
                     Location = new System.Drawing.Point(245, 180),
                     Size = new System.Drawing.Size(135, 32),
@@ -157,7 +177,7 @@ namespace CsfStudio.UI
 
                 var btnCancel = new Button
                 {
-                    Text = "Keep Unknown",
+                    Text = LanguageManager.GetString("UnknownLang.BtnKeepUnknown", "Keep Unknown"),
                     DialogResult = DialogResult.Cancel,
                     Location = new System.Drawing.Point(390, 180),
                     Size = new System.Drawing.Size(100, 32)

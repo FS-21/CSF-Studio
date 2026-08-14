@@ -133,6 +133,15 @@ namespace CsfStudio.Core
                 {
                     try
                     {
+                        if (File.Exists(filePath))
+                        {
+                            var attr = File.GetAttributes(filePath);
+                            if ((attr & FileAttributes.ReadOnly) != 0)
+                            {
+                                File.SetAttributes(filePath, attr & ~FileAttributes.ReadOnly);
+                            }
+                        }
+
                         // File.Copy with overwrite handles read-shared locks better
                         // than FileMode.Create on the target path directly.
                         File.Copy(tempPath, filePath, overwrite: true);
@@ -144,7 +153,19 @@ namespace CsfStudio.Core
                     }
                     catch (UnauthorizedAccessException) when (attempt < MaxRetries)
                     {
-                        // Transient lock from antivirus / indexer — retry.
+                        // Transient lock from antivirus / indexer / read-only attribute — retry after stripping read-only.
+                        try
+                        {
+                            if (File.Exists(filePath))
+                            {
+                                var attr = File.GetAttributes(filePath);
+                                if ((attr & FileAttributes.ReadOnly) != 0)
+                                {
+                                    File.SetAttributes(filePath, attr & ~FileAttributes.ReadOnly);
+                                }
+                            }
+                        }
+                        catch { }
                         System.Threading.Thread.Sleep(RetryDelayMs);
                     }
                 }
