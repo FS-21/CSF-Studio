@@ -516,6 +516,8 @@ namespace CsfStudio.UI
             InitializeKeyEditorTab();
 
             pnlDetailContainer = new Panel { Dock = DockStyle.Fill };
+            pnlLanguageEditors.AutoScroll = false;
+            pnlLanguageEditors.Resize += (s, e) => PerformActiveInspectorResizePass();
             pnlDetailContainer.Controls.Add(pnlLanguageEditors);
             pnlDetailContainer.Controls.Add(pnlDetailHeader);
             splitMasterDetail.Panel2.Controls.Add(pnlDetailContainer);
@@ -3392,22 +3394,22 @@ namespace CsfStudio.UI
 
                 pnlMultiScroll.Resize += (s, e) =>
                 {
-                    if (_isWindowResizing || pnlMultiScroll.IsDisposed || _multiBuildToken != currentToken) return;
-                    int containerWidth = Math.Max(350, (pnlMultiScroll.ClientSize.Width > 100 ? pnlMultiScroll.ClientSize.Width : targetContainer.ClientSize.Width) - 25);
+                    if (pnlMultiScroll.IsDisposed || _multiBuildToken != currentToken) return;
+                    int containerWidth = Math.Max(350, pnlMultiScroll.ClientSize.Width - 25);
 
                     pnlMultiScroll.SuspendLayout();
                     foreach (Control ctrl in pnlMultiScroll.Controls)
                     {
                         if (ctrl is GroupBox grp)
                         {
-                            grp.Width = containerWidth;
+                            ForceCardLayoutUpdate(grp, containerWidth);
                         }
                         else if (ctrl is Panel banner)
                         {
                             banner.Width = containerWidth;
                         }
                     }
-                    pnlMultiScroll.ResumeLayout(false);
+                    pnlMultiScroll.ResumeLayout(true);
                 };
 
                 pnlMultiScroll.SuspendLayout();
@@ -3421,7 +3423,7 @@ namespace CsfStudio.UI
                         Width = lastContainerWidth,
                         Height = 26,
                         BackColor = Color.FromArgb(240, 244, 250),
-                        Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                        Anchor = AnchorStyles.Top | AnchorStyles.Left
                     };
                     var lblBanner = new Label
                     {
@@ -3574,7 +3576,7 @@ namespace CsfStudio.UI
                 Width = containerWidth,
                 Height = totalCardHeight,
                 Tag = row,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                Anchor = AnchorStyles.Top | AnchorStyles.Left
             };
             grpKey.SuspendLayout();
 
@@ -5219,6 +5221,7 @@ namespace CsfStudio.UI
             try
             {
                 targetContainer.SuspendLayout();
+                if (targetContainer is Panel p) p.AutoScroll = false;
                 targetContainer.Controls.Clear();
                 _langTextEditors.Clear();
                 _langLengthLabels.Clear();
@@ -11221,13 +11224,10 @@ namespace CsfStudio.UI
         private const int WM_ENTERSIZEMOVE = 0x0231;
         private const int WM_EXITSIZEMOVE  = 0x0232;
 
-        private bool _isWindowResizing = false;
-
         protected override void WndProc(ref Message m)
         {
             if (m.Msg == WM_ENTERSIZEMOVE)
             {
-                _isWindowResizing = true;
                 if (this.IsHandleCreated)
                 {
                     SendMessage(this.Handle, WM_SETREDRAW, IntPtr.Zero, IntPtr.Zero);
@@ -11235,11 +11235,10 @@ namespace CsfStudio.UI
             }
             else if (m.Msg == WM_EXITSIZEMOVE)
             {
-                _isWindowResizing = false;
                 if (this.IsHandleCreated)
                 {
-                    PerformActiveInspectorResizePass();
                     SendMessage(this.Handle, WM_SETREDRAW, (IntPtr)1, IntPtr.Zero);
+                    PerformActiveInspectorResizePass();
                     this.PerformLayout();
                     this.Refresh();
                 }
@@ -11252,16 +11251,27 @@ namespace CsfStudio.UI
             if (pnlLanguageEditors == null || pnlLanguageEditors.Controls.Count == 0) return;
             foreach (Control c in pnlLanguageEditors.Controls)
             {
-                if (c is Panel pnl && pnl.Visible)
+                if (c is TableLayoutPanel tbl)
+                {
+                    tbl.PerformLayout();
+                    tbl.Invalidate();
+                }
+                else if (c is Panel pnl && pnl.Visible)
                 {
                     int containerWidth = Math.Max(350, pnl.ClientSize.Width - 25);
                     pnl.SuspendLayout();
                     foreach (Control ctrl in pnl.Controls)
                     {
-                        if (ctrl is GroupBox grp) grp.Width = containerWidth;
-                        else if (ctrl is Panel banner) banner.Width = containerWidth;
+                        if (ctrl is GroupBox grp)
+                        {
+                            ForceCardLayoutUpdate(grp, containerWidth);
+                        }
+                        else if (ctrl is Panel banner)
+                        {
+                            banner.Width = containerWidth;
+                        }
                     }
-                    pnl.ResumeLayout(false);
+                    pnl.ResumeLayout(true);
                 }
             }
         }

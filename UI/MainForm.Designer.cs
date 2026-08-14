@@ -969,7 +969,7 @@ namespace CsfStudio.UI
             // 
             // pnlLanguageEditors
             // 
-            this.pnlLanguageEditors.AutoScroll = true;
+            this.pnlLanguageEditors.AutoScroll = false;
             this.pnlLanguageEditors.Dock = System.Windows.Forms.DockStyle.Fill;
             this.pnlLanguageEditors.Location = new System.Drawing.Point(0, 35);
             this.pnlLanguageEditors.Name = "pnlLanguageEditors";
