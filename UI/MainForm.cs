@@ -9468,7 +9468,7 @@ namespace CsfStudio.UI
                     foreach (DataGridViewColumn col in gridLabels.Columns)
                     {
                         if (col.Name == "colIndex" || col.HeaderText == "#") col.HeaderText = LanguageManager.GetString("Grid.Column.Index", "#");
-                        else if (col.Name == "colStatus") col.HeaderText = LanguageManager.GetString("Grid.Column.Status", "Status");
+                        else if (col.Name == "colStatus") { col.HeaderText = ""; col.ToolTipText = LanguageManager.GetString("ToolTip.GridColStatus", "Synchronization & Text Status:\n🟢 Complete (Valid text)\n🟡 Empty (Blank text in some/all files)\n🔴 Missing (Key missing in some files)"); }
                         else if (col.Name == "colKey" || col.HeaderText == "Key" || col.HeaderText == "Key Name") col.HeaderText = LanguageManager.GetString("Grid.Column.Key", "Key");
                         else if (col.Name == "colVal" || col.HeaderText == "String Value" || col.HeaderText == "Value") col.HeaderText = LanguageManager.GetString("Grid.Column.Value", "String Value");
                         else if (col.Name == "colExtra" || col.HeaderText == "Extra Sound" || col.HeaderText == "Extra Value") col.HeaderText = LanguageManager.GetString("Grid.Column.ExtraValue", "Extra Sound");
