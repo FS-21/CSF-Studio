@@ -430,6 +430,7 @@ namespace CsfStudio.UI
             gridLabels.SelectionChanged += (s, e) => TriggerGridSelectionChanged(gridLabels);
             gridUnsaved.SelectionChanged += (s, e) => TriggerGridSelectionChanged(gridUnsaved);
             gridRecent.SelectionChanged += (s, e) => TriggerGridSelectionChanged(gridRecent);
+            gridCoverage.SelectionChanged += (s, e) => TriggerGridSelectionChanged(gridCoverage);
 
 
 
