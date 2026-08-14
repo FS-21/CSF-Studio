@@ -505,7 +505,7 @@ namespace CsfStudio.UI
                 }
             };
 
-            ToolTipHelper.SetToolTip(tabMaster, LanguageManager.GetString("ToolTip.Tab.Master", "📋 Master String Table: View and edit all keys across loaded CSF files in a side-by-side or master grid table."));
+            ToolTipHelper.SetToolTip(tabMaster, LanguageManager.GetString("ToolTip.Tab.Master", "📋 Master Keys View: View and edit all keys across loaded CSF files in a side-by-side or master grid table."));
             ToolTipHelper.SetToolTip(tabUnsaved, LanguageManager.GetString("ToolTip.Tab.Unsaved", "⚠️ Unsaved Changes: Inspector tab listing all modified string keys waiting to be saved to disk."));
             ToolTipHelper.SetToolTip(tabRecent, LanguageManager.GetString("ToolTip.Tab.Recent", "🕒 Recent Edits: History log of keys modified during the current editing session."));
             ToolTipHelper.SetToolTip(tabCoverage, LanguageManager.GetString("ToolTip.Tab.Coverage", "📊 Coverage Matrix: Key completion percentage matrix across all open CSF files."));
@@ -9434,7 +9434,7 @@ namespace CsfStudio.UI
                 if (tabMaster != null)
                 {
                     tabMaster.Text = LanguageManager.GetString("Tab.MasterView", "Master Keys View");
-                    ToolTipHelper.SetToolTip(tabMaster, LanguageManager.GetString("ToolTip.Tab.Master", "Master String Table: View and edit all keys across loaded CSF files in a side-by-side or master grid table."));
+                    ToolTipHelper.SetToolTip(tabMaster, LanguageManager.GetString("ToolTip.Tab.Master", "Master Keys View: View and edit all keys across loaded CSF files in a side-by-side or master grid table."));
                 }
                 if (tabKeyEditor != null)
                 {
@@ -9453,7 +9453,7 @@ namespace CsfStudio.UI
                 }
                 if (tabCoverage != null)
                 {
-                    tabCoverage.Text = LanguageManager.GetString("Tab.Coverage", "Language Coverage");
+                    tabCoverage.Text = LanguageManager.GetString("Tab.Coverage", "Matrix Coverage");
                     ToolTipHelper.SetToolTip(tabCoverage, LanguageManager.GetString("ToolTip.Tab.Coverage", "Coverage Matrix: Key completion percentage matrix across all open CSF files."));
                 }
                 if (tabBackups != null)

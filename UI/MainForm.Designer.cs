@@ -1088,7 +1088,7 @@ namespace CsfStudio.UI
             this.tabCoverage.Padding = new System.Windows.Forms.Padding(3);
             this.tabCoverage.Size = new System.Drawing.Size(1012, 528);
             this.tabCoverage.TabIndex = 2;
-            this.tabCoverage.Text = "Coverage Matrix";
+            this.tabCoverage.Text = "Matrix Coverage";
             this.tabCoverage.UseVisualStyleBackColor = true;
             // 
             // pnlCoverageHeader
