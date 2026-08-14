@@ -1020,6 +1020,7 @@ namespace CsfStudio.UI
                                         firstStr.ExtraValue = item.ImportedExtra;
                                         break;
                                 }
+                                MarkKeyAsModified(sDoc.LanguageTag, item.KeyName);
                             }
                             else
                             {
@@ -1038,6 +1039,8 @@ namespace CsfStudio.UI
                                         sDoc.Document.Labels.Add(new CsfLabel(item.KeyName, string.Empty, item.ImportedExtra));
                                         break;
                                 }
+                                _addedKeyNames.Add(item.KeyName);
+                                MarkKeyAsModified(sDoc.LanguageTag, item.KeyName);
                             }
                             importedCount++;
                         }
@@ -1063,6 +1066,10 @@ namespace CsfStudio.UI
                         ShowSaveNotification(string.Format(LanguageManager.GetString("Toast.ImportCompleteSingleFormat", "⚡ Import Complete ({0}): Imported {1:N0} keys into [{2}]"), contentMode, selectedItems.Count, targetDoc.LanguageTag));
                     }
 
+                    _unsavedDirty = true;
+                    _coverageDirty = true;
+                    _recentDirty = true;
+                    _keyEditorDirty = true;
                     UpdateUIForSessionMode();
                     RebuildCategoryTreeAndGrid();
                     PopulateMasterGrid();
