@@ -35,7 +35,7 @@ namespace CsfStudio.Core
 
             int version = br.ReadInt32();
             int labelCount = br.ReadInt32();
-            int extraStringCount = br.ReadInt32();
+            int totalStringCount = br.ReadInt32();
             int reserved = br.ReadInt32();
             int languageId = br.ReadInt32();
 
@@ -184,7 +184,7 @@ namespace CsfStudio.Core
             bw.Write(HEADER_MAGIC);
             bw.Write(doc.Version);
             bw.Write(doc.Labels.Count);
-            bw.Write(doc.TotalExtraStringCount);
+            bw.Write(doc.TotalStringCount);
             bw.Write(0); // Reserved
             bw.Write((int)doc.Language);
 
