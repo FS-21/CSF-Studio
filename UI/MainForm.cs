@@ -5875,14 +5875,27 @@ namespace CsfStudio.UI
 
         private void CopyValueToAllOtherDocs(string keyName, string srcLangTag, string srcText, string srcAudio, bool copyText, bool copyAudio)
         {
+            if (_session == null || _session.Documents.Count <= 1 || string.IsNullOrEmpty(keyName)) return;
+
+            var batchCmd = new BatchUndoCommand(string.Format(
+                LanguageManager.GetString("Undo.CopyKeyToAllDocsFormat", "Copy key '{0}' to all other open CSF files"), keyName));
+            int createdCount = 0;
+
             foreach (var doc in _session.Documents.Where(d => !string.Equals(d.LanguageTag, srcLangTag, StringComparison.OrdinalIgnoreCase)))
             {
                 var lbl = doc.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, keyName, StringComparison.OrdinalIgnoreCase));
-                if (lbl == null)
+                bool isNew = (lbl == null);
+
+                if (isNew)
                 {
                     lbl = new CsfLabel(keyName);
                     doc.Document.Labels.Add(lbl);
+                    batchCmd.AddCommand(new AddKeyCommand(keyName, doc.LanguageTag));
+                    MarkKeyAsCreated(keyName);
+                    createdCount++;
                 }
+
+                string oldVal = lbl.Strings.Count > 0 ? lbl.Strings[0].Value : string.Empty;
 
                 if (lbl.Strings.Count == 0)
                 {
@@ -5893,11 +5906,28 @@ namespace CsfStudio.UI
                     if (copyText) lbl.Strings[0].Value = srcText ?? string.Empty;
                     if (copyAudio) lbl.Strings[0].ExtraValue = srcAudio;
                 }
+
                 doc.IsModified = true;
+                MarkKeyAsModified(doc.LanguageTag, keyName);
+
+                if (copyText && (!isNew || !string.IsNullOrEmpty(srcText)))
+                {
+                    batchCmd.AddCommand(new EditValueCommand(doc.LanguageTag, keyName, isNew ? string.Empty : oldVal, srcText ?? string.Empty));
+                }
+            }
+
+            if (batchCmd.Commands.Count > 0)
+            {
+                _undoManager.Execute(batchCmd, _session);
+                UpdateUndoRedoMenuItems();
             }
 
             AddRecentEditedKey(keyName);
             RebuildCategoryTreeAndGrid();
+            RefreshActiveSelectionInspector();
+
+            ShowSaveNotification(string.Format(
+                LanguageManager.GetString("Toast.CopiedKeyToAllDocsFormat", "📋 Copied '{0}' to all other open CSF files."), keyName));
         }
 
         private void MassSyncAudioFromDoc(CsfSessionDocument srcDoc)
@@ -6971,16 +7001,20 @@ namespace CsfStudio.UI
                 foreach (var sDoc in _session.Documents)
                 {
                     var oldLbl = sDoc.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, oldKey, StringComparison.OrdinalIgnoreCase));
+                    var newLbl = new CsfLabel(newKey);
                     if (oldLbl != null)
                     {
-                        var newLbl = new CsfLabel(newKey);
                         foreach (var str in oldLbl.Strings)
                         {
                             newLbl.Strings.Add(new CsfStringEntry(str.Value, str.ExtraValue));
                         }
-                        sDoc.Document.Labels.Add(newLbl);
-                        sDoc.IsModified = true;
                     }
+                    else
+                    {
+                        newLbl.Strings.Add(new CsfStringEntry(string.Empty));
+                    }
+                    sDoc.Document.Labels.Add(newLbl);
+                    sDoc.IsModified = true;
                 }
 
                 batchCmd.AddCommand(new AddKeyCommand(newKey));
@@ -9193,12 +9227,19 @@ namespace CsfStudio.UI
                 keyName = $"{prefix}New_Key_{candidateNumber}";
             }
 
-            if (_session.BaseDocument != null)
+            if (_session != null && _session.Documents.Count > 0)
             {
-                _session.BaseDocument.Document.Labels.Add(new CsfLabel(keyName, string.Empty));
-                _session.BaseDocument.IsModified = true;
+                foreach (var doc in _session.Documents)
+                {
+                    var lbl = doc.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, keyName, StringComparison.OrdinalIgnoreCase));
+                    if (lbl == null)
+                    {
+                        doc.Document.Labels.Add(new CsfLabel(keyName, string.Empty));
+                        doc.IsModified = true;
+                    }
+                }
 
-                _undoManager.Execute(new AddKeyCommand(keyName, _session.BaseDocument.LanguageTag), _session);
+                _undoManager.Execute(new AddKeyCommand(keyName, _session.BaseDocument?.LanguageTag), _session);
                 UpdateUndoRedoMenuItems();
                 MarkKeyAsCreated(keyName);
 
@@ -9535,6 +9576,9 @@ namespace CsfStudio.UI
                 }
 
                 // Context Menus
+                if (_menuGridAddKey != null) _menuGridAddKey.Text = LanguageManager.GetString("Toolbar.AddKey", "➕ Add Key");
+                if (_menuGridDuplicateKey != null) _menuGridDuplicateKey.Text = LanguageManager.GetString("Toolbar.DuplicateKey", "📋 Duplicate Key");
+                if (_menuGridDeleteKey != null) _menuGridDeleteKey.Text = LanguageManager.GetString("Toolbar.DeleteKey", "❌ Delete Key");
                 if (_menuTranslateGridSelection != null) _menuTranslateGridSelection.Text = LanguageManager.GetString("Menu.TranslateSelection", "🌐 Translate Selection...");
                 if (_menuExportSelectedKeys != null) _menuExportSelectedKeys.Text = LanguageManager.GetString("Menu.ExportSelectedKeys", "📤 Export Selected Keys to TXT");
                 if (_menuCopyFrom != null) _menuCopyFrom.Text = LanguageManager.GetString("Menu.CopyFrom", "📋 Copy from...");
@@ -9997,6 +10041,9 @@ namespace CsfStudio.UI
         #region Translation & Context Menu Setup
 
         private ContextMenuStrip _gridContextMenu;
+        private ToolStripMenuItem _menuGridAddKey;
+        private ToolStripMenuItem _menuGridDuplicateKey;
+        private ToolStripMenuItem _menuGridDeleteKey;
         private ToolStripMenuItem _menuTranslateGridSelection;
         private ToolStripMenuItem _menuExportSelectedKeys;
         private ToolStripMenuItem _menuCopyFrom;
@@ -10058,13 +10105,16 @@ namespace CsfStudio.UI
         private void SetupGridContextMenu()
         {
             _gridContextMenu = new ContextMenuStrip();
+            _menuGridAddKey = new ToolStripMenuItem(LanguageManager.GetString("Toolbar.AddKey", "➕ Add Key"), null, (s, e) => menuAddLabel_Click(s, e));
+            _menuGridDuplicateKey = new ToolStripMenuItem(LanguageManager.GetString("Toolbar.DuplicateKey", "📋 Duplicate Key"), null, (s, e) => menuDuplicateKey_Click(s, e));
+            _menuGridDeleteKey = new ToolStripMenuItem(LanguageManager.GetString("Toolbar.DeleteKey", "❌ Delete Key"), null, (s, e) => menuDeleteLabel_Click(s, e));
             _menuTranslateGridSelection = new ToolStripMenuItem(LanguageManager.GetString("Menu.TranslateSelection", "🌐 Translate Selection..."));
             _menuExportSelectedKeys = new ToolStripMenuItem(LanguageManager.GetString("Menu.ExportSelectedKeys", "📤 Export Selected Keys to TXT"));
             _menuCopyFrom = new ToolStripMenuItem(LanguageManager.GetString("Menu.CopyFrom", "📋 Copy from..."));
 
-            _gridContextMenu.Items.Add(new ToolStripMenuItem(LanguageManager.GetString("Toolbar.AddKey", "➕ Add Key"), null, (s, e) => menuAddLabel_Click(s, e)));
-            _gridContextMenu.Items.Add(new ToolStripMenuItem(LanguageManager.GetString("Toolbar.DuplicateKey", "📋 Duplicate Key"), null, (s, e) => menuDuplicateKey_Click(s, e)));
-            _gridContextMenu.Items.Add(new ToolStripMenuItem(LanguageManager.GetString("Toolbar.DeleteKey", "❌ Delete Key"), null, (s, e) => menuDeleteLabel_Click(s, e)));
+            _gridContextMenu.Items.Add(_menuGridAddKey);
+            _gridContextMenu.Items.Add(_menuGridDuplicateKey);
+            _gridContextMenu.Items.Add(_menuGridDeleteKey);
             _gridContextMenu.Items.Add(new ToolStripSeparator());
             _gridContextMenu.Items.Add(_menuExportSelectedKeys);
             _gridContextMenu.Items.Add(_menuCopyFrom);
@@ -10546,9 +10596,12 @@ namespace CsfStudio.UI
             string menuTitle = exists
                 ? string.Format(LanguageManager.GetString("Menu.TranslateEntryFormat", "🌐 Translate '{0}' Entry..."), menuLabel)
                 : string.Format(LanguageManager.GetString("Menu.TranslateEntryMissingFormat", "🌐 Translate '{0}' Entry (Key Missing)"), menuLabel);
+
+            bool hasReferenceTextInSession = exists || (!string.IsNullOrEmpty(keyName) && _session != null && _session.Documents.Any(d => d.Document != null && d.Document.Labels.Any(l => string.Equals(l.Name, keyName, StringComparison.OrdinalIgnoreCase) && l.Strings.Count > 0 && !string.IsNullOrWhiteSpace(l.Strings[0].Value))));
+
             var menuTranslate = new ToolStripMenuItem(menuTitle)
             {
-                Enabled = exists
+                Enabled = exists || hasReferenceTextInSession
             };
 
             var configuredServices = CsfStudio.Core.Translation.TranslationConfigManager.ConfiguredServices?.Where(s => s.IsEnabled).ToList();
@@ -10574,6 +10627,46 @@ namespace CsfStudio.UI
                         }
                     });
                     menuTranslate.DropDownItems.Add(itemService);
+                }
+
+                if (_session != null && _session.Documents.Count > 1)
+                {
+                    menuTranslate.DropDownItems.Add(new ToolStripSeparator());
+
+                    if (configuredServices.Count == 1)
+                    {
+                        var singleService = configuredServices[0];
+                        string itemAllText = string.Format(LanguageManager.GetString("Menu.TranslateAllSingleServiceFormat", "🌐 Translate into ALL other open CSF files (with {0})"), singleService.DisplayName);
+                        var itemAll = new ToolStripMenuItem(itemAllText, null, (s, e) =>
+                        {
+                            var readyConfig = EnsureTranslationServiceConfigured(singleService);
+                            if (readyConfig == null) return;
+                            ExecuteTranslateEntryIntoAllOtherDocs(readyConfig, keyName, textToTranslate, targetDoc, targetTextBox);
+                        });
+                        menuTranslate.DropDownItems.Add(itemAll);
+                    }
+                    else
+                    {
+                        var menuTranslateAll = new ToolStripMenuItem(LanguageManager.GetString("Menu.TranslateIntoAllOpenDocs", "🌐 Translate into ALL other open CSF files..."));
+
+                        foreach (var serviceConfig in configuredServices)
+                        {
+                            var sConfig = serviceConfig;
+                            string iconStr = (sConfig.IsAiModel && !sConfig.DisplayName.StartsWith("[AI]", StringComparison.OrdinalIgnoreCase))
+                                ? "[AI] "
+                                : ((!sConfig.DisplayName.StartsWith("🌐") && !sConfig.DisplayName.StartsWith("[AI]")) ? "🌐 " : "");
+                            string itemAllText = string.Format(LanguageManager.GetString("Menu.TranslateAllWithServiceFormat", "{0}... with {1}"), iconStr, sConfig.DisplayName);
+                            var itemAllService = new ToolStripMenuItem(itemAllText, null, (s, e) =>
+                            {
+                                var readyConfig = EnsureTranslationServiceConfigured(sConfig);
+                                if (readyConfig == null) return;
+                                ExecuteTranslateEntryIntoAllOtherDocs(readyConfig, keyName, textToTranslate, targetDoc, targetTextBox);
+                            });
+                            menuTranslateAll.DropDownItems.Add(itemAllService);
+                        }
+
+                        menuTranslate.DropDownItems.Add(menuTranslateAll);
+                    }
                 }
 
                 menuTranslate.DropDownItems.Add(new ToolStripSeparator());
@@ -10854,6 +10947,232 @@ namespace CsfStudio.UI
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
                 lblStatusCount.Text = LanguageManager.GetString("MainForm.StatusTranslationError", "❌ Translation error.");
+            }
+        }
+
+        private async void ExecuteTranslateEntryIntoAllOtherDocs(CsfStudio.Core.Translation.TranslationServiceConfig sConfig, string keyName, string textToTranslate, CsfSessionDocument sourceDoc, TextBox sourceTextBox = null)
+        {
+            if (sConfig == null || _session == null || string.IsNullOrEmpty(keyName)) return;
+
+            if (_session.Documents.Count <= 1)
+            {
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.NoOtherOpenDocs", "There are no other open CSF files in this session to translate into."),
+                    LanguageManager.GetString("Title.InstantTranslation", "Instant Translation"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            if (sourceDoc == null)
+            {
+                sourceDoc = _session.BaseDocument;
+            }
+
+            // 1. Resolve source text
+            string sourceText = null;
+            if (sourceTextBox != null && !sourceTextBox.IsDisposed && !string.IsNullOrWhiteSpace(sourceTextBox.Text))
+            {
+                sourceText = sourceTextBox.Text;
+            }
+            else if (!string.IsNullOrWhiteSpace(textToTranslate))
+            {
+                sourceText = textToTranslate;
+            }
+            else if (sourceDoc != null && sourceDoc.Document != null)
+            {
+                var lbl = sourceDoc.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, keyName, StringComparison.OrdinalIgnoreCase));
+                if (lbl != null && lbl.Strings.Count > 0 && !string.IsNullOrWhiteSpace(lbl.Strings[0].Value))
+                {
+                    sourceText = lbl.Strings[0].Value;
+                }
+            }
+
+            // Fallback to base doc if sourceDoc didn't have text
+            if (string.IsNullOrWhiteSpace(sourceText) && _session.BaseDocument != null && _session.BaseDocument.Document != null)
+            {
+                var lbl = _session.BaseDocument.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, keyName, StringComparison.OrdinalIgnoreCase));
+                if (lbl != null && lbl.Strings.Count > 0 && !string.IsNullOrWhiteSpace(lbl.Strings[0].Value))
+                {
+                    sourceText = lbl.Strings[0].Value;
+                    sourceDoc = _session.BaseDocument;
+                }
+            }
+
+            // Fallback to any open doc with text
+            if (string.IsNullOrWhiteSpace(sourceText))
+            {
+                foreach (var doc in _session.Documents)
+                {
+                    if (doc.Document == null) continue;
+                    var lbl = doc.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, keyName, StringComparison.OrdinalIgnoreCase));
+                    if (lbl != null && lbl.Strings.Count > 0 && !string.IsNullOrWhiteSpace(lbl.Strings[0].Value))
+                    {
+                        sourceText = lbl.Strings[0].Value;
+                        sourceDoc = doc;
+                        break;
+                    }
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(sourceText))
+            {
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.NoReferenceTextAvailable", "There is no reference text available in other open CSF files to translate this entry."),
+                    LanguageManager.GetString("Title.InstantTranslation", "Instant Translation"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            // 2. Resolve source language
+            string sourceLanguage = sourceDoc != null ? GetTranslationLanguageForDocument(sourceDoc, true) : null;
+            if (string.IsNullOrEmpty(sourceLanguage))
+            {
+                sourceLanguage = _session.BaseDocument != null ? GetTranslationLanguageForDocument(_session.BaseDocument, true) : "auto";
+            }
+            if (string.IsNullOrEmpty(sourceLanguage)) sourceLanguage = "auto";
+
+            // 3. Target documents
+            var targetDocs = _session.Documents.Where(d => !ReferenceEquals(d, sourceDoc)).ToList();
+            if (targetDocs.Count == 0) return;
+
+            var batchCmd = new BatchUndoCommand(string.Format(
+                LanguageManager.GetString("Undo.TranslateEntryToAllDocsFormat", "Translate key '{0}' into all open CSF files via {1}"),
+                keyName, sConfig.DisplayName));
+
+            int successCount = 0;
+            int errorCount = 0;
+            var provider = CsfStudio.Core.Translation.TranslationProviderFactory.CreateProvider(sConfig);
+
+            Cursor = Cursors.WaitCursor;
+
+            try
+            {
+                var translatedByLanguage = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+                for (int i = 0; i < targetDocs.Count; i++)
+                {
+                    var doc = targetDocs[i];
+                    string targetIso = GetTranslationLanguageForDocument(doc, true);
+                    if (string.IsNullOrEmpty(targetIso) || string.Equals(targetIso, sourceLanguage, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    lblStatusCount.Text = string.Format(
+                        LanguageManager.GetString("MainForm.TranslatingMultiDocFormat", "⏳ Translating '{0}' into open CSF files via {1} ({2}/{3}: [{4}])..."),
+                        keyName, sConfig.DisplayName, i + 1, targetDocs.Count, doc.LanguageTag);
+
+                    string translatedText = null;
+
+                    if (translatedByLanguage.TryGetValue(targetIso, out var cached))
+                    {
+                        translatedText = cached;
+                    }
+                    else
+                    {
+                        try
+                        {
+                            var item = new CsfStudio.Core.Translation.TranslationItem { Key = keyName, SourceText = sourceText };
+                            var result = await Task.Run(() => provider.TranslateBatchAsync(
+                                new List<CsfStudio.Core.Translation.TranslationItem> { item },
+                                sourceLanguage,
+                                targetIso,
+                                System.Threading.CancellationToken.None));
+
+                            if (result != null && result.Items.Count > 0 && !string.IsNullOrEmpty(result.Items[0].TranslatedText))
+                            {
+                                translatedText = result.Items[0].TranslatedText;
+                                translatedByLanguage[targetIso] = translatedText;
+                            }
+                            else
+                            {
+                                errorCount++;
+                            }
+                        }
+                        catch
+                        {
+                            errorCount++;
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(translatedText))
+                    {
+                        var lbl = doc.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, keyName, StringComparison.OrdinalIgnoreCase));
+                        bool isNew = (lbl == null);
+
+                        if (isNew)
+                        {
+                            lbl = new CsfLabel(keyName);
+                            doc.Document.Labels.Add(lbl);
+                            batchCmd.AddCommand(new AddKeyCommand(keyName, doc.LanguageTag));
+                            MarkKeyAsCreated(keyName);
+                        }
+
+                        string oldVal = lbl.Strings.Count > 0 ? lbl.Strings[0].Value : string.Empty;
+
+                        if (lbl.Strings.Count == 0)
+                        {
+                            lbl.Strings.Add(new CsfStringEntry(translatedText));
+                        }
+                        else
+                        {
+                            lbl.Strings[0].Value = translatedText;
+                        }
+
+                        doc.IsModified = true;
+                        MarkKeyAsModified(doc.LanguageTag, keyName);
+                        batchCmd.AddCommand(new EditValueCommand(doc.LanguageTag, keyName, isNew ? string.Empty : oldVal, translatedText));
+                        UpdateGridRowAfterValueChange(keyName, doc);
+
+                        if (_langTextEditors.TryGetValue(doc.LanguageTag, out var txtEditor) && txtEditor != null && !txtEditor.IsDisposed)
+                        {
+                            _isPopulatingInspector = true;
+                            try
+                            {
+                                txtEditor.Text = NormalizeToWinFormsLineBreaks(translatedText);
+                            }
+                            finally
+                            {
+                                _isPopulatingInspector = false;
+                            }
+                        }
+
+                        successCount++;
+                    }
+                }
+            }
+            finally
+            {
+                Cursor = Cursors.Default;
+            }
+
+            if (batchCmd.Commands.Count > 0)
+            {
+                _undoManager.Execute(batchCmd, _session);
+                UpdateUndoRedoMenuItems();
+            }
+
+            AddRecentEditedKey(keyName);
+            RebuildCategoryTreeAndGrid();
+            RefreshActiveSelectionInspector();
+
+            if (successCount > 0)
+            {
+                string successMsg = string.Format(
+                    LanguageManager.GetString("Toast.TranslatedMultiSuccessFormat", "⚡ Translated '{0}' into {1} open CSF file(s) via {2}."),
+                    keyName, successCount, sConfig.DisplayName);
+                lblStatusCount.Text = successMsg;
+                ShowSaveNotification(successMsg);
+            }
+            else
+            {
+                string failMsg = string.Format(
+                    LanguageManager.GetString("Toast.TranslatedMultiFail", "⚠️ Failed to translate '{0}' into other open CSF files."),
+                    keyName);
+                lblStatusCount.Text = failMsg;
+                ShowSaveNotification(failMsg);
             }
         }
 

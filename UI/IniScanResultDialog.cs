@@ -15,6 +15,7 @@ namespace CsfStudio.UI
         private Button btnCreateAllMissing;
         private Button btnClose;
         private CheckBox chkShowExisting;
+        private CheckBox chkUniqueKeysOnly;
         private Label lblSummary;
         private Label lblFilePath;
         private DataGridView grid;
@@ -91,12 +92,12 @@ namespace CsfStudio.UI
                 Padding = new Padding(0)
             };
 
-            mainTable.RowStyles.Add(new RowStyle(SizeType.Absolute, 78F));
+            mainTable.RowStyles.Add(new RowStyle(SizeType.Absolute, 84F));
             mainTable.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             mainTable.RowStyles.Add(new RowStyle(SizeType.Absolute, 55F));
 
             // 1. TOP PANEL
-            var panelTop = new Panel { Dock = DockStyle.Fill, Height = 78, Padding = new Padding(10), BackColor = Color.FromArgb(245, 247, 250), Margin = new Padding(0) };
+            var panelTop = new Panel { Dock = DockStyle.Fill, Height = 84, Padding = new Padding(10), BackColor = Color.FromArgb(245, 247, 250), Margin = new Padding(0) };
 
             string headerText = _isMultiFile
                 ? string.Format(LanguageManager.GetString("IniScan.HeaderMultiFilesFormat", "📄 Scanned Files ({0} files): {1}"), ScannedFilesMap.Count, string.Join(", ", ScannedFilesMap.Keys.Select(Path.GetFileName)))
@@ -120,22 +121,47 @@ namespace CsfStudio.UI
                 ForeColor = Color.Black
             };
 
+            var pnlCheckboxes = new FlowLayoutPanel
+            {
+                Location = new Point(10, 52),
+                Size = new Size(950, 26),
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                AutoSize = true,
+                BackColor = Color.Transparent,
+                Margin = Padding.Empty,
+                Padding = Padding.Empty
+            };
+
             chkShowExisting = new CheckBox
             {
                 Text = LanguageManager.GetString("IniScan.ShowExisting", "☑ Show Existing Keys (🟢 EXISTS) & Inline Literals (🔹 NOSTR)"),
-                Location = new Point(10, 52),
                 AutoSize = true,
                 Checked = false, // Hidden by default
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(20, 60, 120),
                 Cursor = Cursors.Hand
             };
-
             chkShowExisting.CheckedChanged += (s, e) => PopulateAllData();
+
+            chkUniqueKeysOnly = new CheckBox
+            {
+                Text = LanguageManager.GetString("IniScan.ShowUniqueOnly", "☑ Show Unique Keys Only"),
+                AutoSize = true,
+                Checked = false,
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(30, 90, 40),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(25, 0, 0, 0)
+            };
+            chkUniqueKeysOnly.CheckedChanged += (s, e) => PopulateAllData();
+
+            pnlCheckboxes.Controls.Add(chkShowExisting);
+            pnlCheckboxes.Controls.Add(chkUniqueKeysOnly);
 
             panelTop.Controls.Add(lblFilePath);
             panelTop.Controls.Add(lblSummary);
-            panelTop.Controls.Add(chkShowExisting);
+            panelTop.Controls.Add(pnlCheckboxes);
 
             // 2. MIDDLE UNIFIED GRID
             grid = new DataGridView
@@ -155,14 +181,21 @@ namespace CsfStudio.UI
             };
 
             var boldStyle = new DataGridViewCellStyle { Font = new Font("Segoe UI", 9F, FontStyle.Bold) };
+            string colKeyHeader = LanguageManager.GetString("IniScan.ColRefKey", "CSF Key (Referenced)");
 
             if (_isMultiFile)
             {
                 var colFile = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("IniScan.ColFile", "INI File"), ReadOnly = true, FillWeight = 20 };
                 var colSection = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("IniScan.ColSection", "INI Section"), ReadOnly = true, FillWeight = 20 };
                 var colProperty = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("IniScan.ColProperty", "INI Property"), ReadOnly = true, FillWeight = 18 };
-                var colKey = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("IniScan.ColRefKey", "Referenced Key"), ReadOnly = true, FillWeight = 27, DefaultCellStyle = boldStyle };
+                var colKey = new DataGridViewTextBoxColumn { HeaderText = colKeyHeader, ReadOnly = true, FillWeight = 27, DefaultCellStyle = boldStyle };
                 var colStatus = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Grid.Column.Status", "CSF Status"), ReadOnly = true, FillWeight = 15 };
+
+                colFile.ToolTipText = LanguageManager.GetString("ToolTip.IniScan.ColFile", "INI File: Name of the mod configuration or map file where this string reference was found.");
+                colSection.ToolTipText = LanguageManager.GetString("ToolTip.IniScan.ColSection", "INI Section: The section header [SectionName] in the INI file containing this property.");
+                colProperty.ToolTipText = LanguageManager.GetString("ToolTip.IniScan.ColProperty", "INI Property: The property key (e.g. UIName, Name) that refers to a CSF string table entry.");
+                colKey.ToolTipText = LanguageManager.GetString("ToolTip.IniScan.ColRefKey", "CSF String Key: The label/key name expected in the CSF string table (e.g. 'Name:E1'). This is the entry that will be created in your CSF file(s).");
+                colStatus.ToolTipText = LanguageManager.GetString("ToolTip.IniScan.ColStatus", "CSF Status:\n🟢 EXISTS: Found in current CSF\n🔴 MISSING: Not found in CSF\n🔹 INLINE: Hardcoded NOSTR: literal");
 
                 grid.Columns.AddRange(colFile, colSection, colProperty, colKey, colStatus);
             }
@@ -170,8 +203,13 @@ namespace CsfStudio.UI
             {
                 var colSection = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("IniScan.ColSection", "INI Section"), ReadOnly = true, FillWeight = 25 };
                 var colProperty = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("IniScan.ColProperty", "INI Property"), ReadOnly = true, FillWeight = 20 };
-                var colKey = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("IniScan.ColRefKey", "Referenced Key"), ReadOnly = true, FillWeight = 35, DefaultCellStyle = boldStyle };
+                var colKey = new DataGridViewTextBoxColumn { HeaderText = colKeyHeader, ReadOnly = true, FillWeight = 35, DefaultCellStyle = boldStyle };
                 var colStatus = new DataGridViewTextBoxColumn { HeaderText = LanguageManager.GetString("Grid.Column.Status", "CSF Status"), ReadOnly = true, FillWeight = 20 };
+
+                colSection.ToolTipText = LanguageManager.GetString("ToolTip.IniScan.ColSection", "INI Section: The section header [SectionName] in the INI file containing this property.");
+                colProperty.ToolTipText = LanguageManager.GetString("ToolTip.IniScan.ColProperty", "INI Property: The property key (e.g. UIName, Name) that refers to a CSF string table entry.");
+                colKey.ToolTipText = LanguageManager.GetString("ToolTip.IniScan.ColRefKey", "CSF String Key: The label/key name expected in the CSF string table (e.g. 'Name:E1'). This is the entry that will be created in your CSF file(s).");
+                colStatus.ToolTipText = LanguageManager.GetString("ToolTip.IniScan.ColStatus", "CSF Status:\n🟢 EXISTS: Found in current CSF\n🔴 MISSING: Not found in CSF\n🔹 INLINE: Hardcoded NOSTR: literal");
 
                 grid.Columns.AddRange(colSection, colProperty, colKey, colStatus);
             }
@@ -264,6 +302,8 @@ namespace CsfStudio.UI
             ToolTipHelper.SetToolTip(btnCreateAllMissing, LanguageManager.GetString("ToolTip.IniScan.AddAllMissing", "Add ALL Missing Keys: Automatically add ALL unique missing string key slots found in scan into open CSF files."));
             ToolTipHelper.SetToolTip(btnCreateMissing, LanguageManager.GetString("ToolTip.IniScan.AddSelected", "Add Selected Keys: Automatically add only selected missing string key slots into open CSF files."));
             ToolTipHelper.SetToolTip(btnClose, LanguageManager.GetString("ToolTip.IniScan.Close", "Close window."));
+            if (chkUniqueKeysOnly != null)
+                ToolTipHelper.SetToolTip(chkUniqueKeysOnly, LanguageManager.GetString("ToolTip.IniScan.ShowUniqueOnly", "When checked, duplicates are hidden and each referenced CSF key is shown only once."));
         }
 
         private void UpdateButtonStates()
@@ -339,19 +379,41 @@ namespace CsfStudio.UI
             int nostrCount = _allResults.Count(r => r.IsNostrInline);
             int existCount = _allResults.Count(r => r.ExistsInCsf && !r.IsNostrInline);
 
+            int uniqueMissingCount = _allResults
+                .Where(r => !r.ExistsInCsf && !r.IsNostrInline)
+                .Select(r => r.KeyName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
+            int uniqueTotalCount = _allResults
+                .Select(r => r.KeyName)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count();
+
             lblSummary.Text = string.Format(
-                LanguageManager.GetString("IniScan.SummaryFormat", "Total INI references: {0:N0}   |   🟢 Exist in CSF: {1:N0}   |   🔹 Inline NOSTR: {2:N0}   |   🔴 Missing in CSF: {3:N0}"),
-                _allResults.Count, existCount, nostrCount, missingCount);
+                LanguageManager.GetString("IniScan.SummaryWithUniqueFormat", "Total INI references: {0:N0} ({1:N0} unique keys)   |   🟢 Exist in CSF: {2:N0}   |   🔹 Inline NOSTR: {3:N0}   |   🔴 Missing in CSF: {4:N0} ({5:N0} unique keys to add)"),
+                _allResults.Count, uniqueTotalCount, existCount, nostrCount, missingCount, uniqueMissingCount);
 
             bool showAll = chkShowExisting != null && chkShowExisting.Checked;
+            bool uniqueOnly = chkUniqueKeysOnly != null && chkUniqueKeysOnly.Checked;
 
             grid.Rows.Clear();
+            var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var refCounts = _allResults
+                .GroupBy(r => r.KeyName, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
 
             foreach (var item in _allResults)
             {
                 bool isMissing = !item.ExistsInCsf && !item.IsNostrInline;
 
                 if (!showAll && !isMissing) continue;
+
+                if (uniqueOnly)
+                {
+                    if (seenKeys.Contains(item.KeyName)) continue;
+                    seenKeys.Add(item.KeyName);
+                }
 
                 string statusText = item.IsNostrInline
                     ? LanguageManager.GetString("IniScan.StatusInlineNostr", "🟢 INLINE (NOSTR)")
@@ -382,6 +444,13 @@ namespace CsfStudio.UI
 
                 var row = grid.Rows[rowIndex];
                 row.Tag = item;
+
+                if (refCounts.TryGetValue(item.KeyName, out int count) && count > 1)
+                {
+                    int keyColIdx = _isMultiFile ? 3 : 2;
+                    row.Cells[keyColIdx].ToolTipText = string.Format(
+                        LanguageManager.GetString("IniScan.KeyRefCountTooltipFormat", "Referenced {0} times across scanned INI/MAP files."), count);
+                }
 
                 if (item.IsNostrInline)
                 {
