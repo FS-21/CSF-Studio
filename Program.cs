@@ -6,7 +6,7 @@ namespace CsfStudio
 {
     public static class AppInfo
     {
-        public const string Version = "1.5.7";
+        public const string Version = "1.5.8";
         public const string Title = "CSF Studio";
         public static string FullVersion => $"v{Version}";
         public static string WindowTitle => $"{Title} v{Version} (Another C&C CSF String Table Editor)";

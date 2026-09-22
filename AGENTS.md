@@ -7,7 +7,7 @@
 - Build: `& "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe" CSFStudio.sln /p:Configuration=Debug` (or open `CSFStudio.sln` in Visual Studio). Old-style non-SDK csproj — do not use `dotnet build`.
 - **Close any running `CSF Studio.exe` before building** — the output exe is locked while the app runs and the build fails at the copy step (MSB3021).
 - There are **no tests, no CI, no linter** — verification = clean build + manual run of `bin\Debug\CSF Studio.exe`.
-- This is **not a git repository**.
+- Repository: GitHub `FS-21/CSF-Studio` (`main` branch). Release builds trigger on `v*` tags.
 
 ## Project mechanics (easy to get wrong)
 

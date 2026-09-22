@@ -778,9 +778,10 @@ namespace CsfStudio.UI
             "🎯 All Statuses",
             "🔴 Missing Keys Only",
             "🟡 Empty Strings Only",
-            "🟢 Complete Keys Only"});
+            "🟢 Complete Keys Only",
+            "🔵 Modified Keys Only"});
             this.cboStatusFilter.Name = "cboStatusFilter";
-            this.cboStatusFilter.Size = new System.Drawing.Size(150, 26);
+            this.cboStatusFilter.Size = new System.Drawing.Size(165, 26);
             // 
             // statusStrip1
             // 

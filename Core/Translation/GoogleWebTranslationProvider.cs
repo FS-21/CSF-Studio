@@ -34,12 +34,16 @@ namespace CsfStudio.Core.Translation
             string src = MapLangCode(sourceLang);
             string tgt = MapLangCode(targetLang);
 
+            int successCount = 0;
+            string firstError = null;
+
             foreach (var item in items)
             {
                 if (cancellationToken.IsCancellationRequested) break;
                 if (string.IsNullOrEmpty(item.SourceText))
                 {
                     item.TranslatedText = string.Empty;
+                    successCount++;
                     continue;
                 }
 
@@ -57,19 +61,28 @@ namespace CsfStudio.Core.Translation
                     if (!string.IsNullOrEmpty(transRes.Text))
                     {
                         item.TranslatedText = transRes.Text;
+                        successCount++;
+                        try { item.OnCompleted?.Invoke(item); } catch { }
                     }
                     else
                     {
                         item.ErrorMessage = transRes.ErrorMessage ?? "Google Translate returned an empty response or unexpected format.";
+                        if (firstError == null) firstError = item.ErrorMessage;
                     }
                 }
                 catch (Exception ex)
                 {
                     item.ErrorMessage = ex.Message;
+                    if (firstError == null) firstError = ex.Message;
                 }
             }
 
-            result.Success = true;
+            result.Success = (successCount > 0);
+            if (!result.Success && !string.IsNullOrEmpty(firstError))
+            {
+                result.ErrorMessage = firstError;
+            }
+
             return result;
         }
 
@@ -119,16 +132,23 @@ namespace CsfStudio.Core.Translation
                 }
 
                 string encodedText = Uri.EscapeDataString(core);
-                string url = Config.UrlTemplate
+                string urlTemplate = Config.UrlTemplate ?? string.Empty;
+                if (urlTemplate.Contains("client=gtx"))
+                {
+                    urlTemplate = urlTemplate.Replace("client=gtx", "client=dict-chrome-ex");
+                }
+
+                string url = urlTemplate
                     .Replace("{src}", src)
                     .Replace("{tgt}", tgt)
                     .Replace("{text}", encodedText);
 
+                string userAgent = !string.IsNullOrWhiteSpace(Config.UserAgent)
+                    ? Config.UserAgent
+                    : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
-                if (!string.IsNullOrWhiteSpace(Config.UserAgent))
-                {
-                    request.Headers.UserAgent.ParseAdd(Config.UserAgent);
-                }
+                request.Headers.UserAgent.ParseAdd(userAgent);
 
                 var response = await _httpClient.SendAsync(request, cancellationToken);
                 if (response.StatusCode == (HttpStatusCode)429 || response.StatusCode == HttpStatusCode.Forbidden)
@@ -136,17 +156,39 @@ namespace CsfStudio.Core.Translation
                     return new SingleTranslationResult
                     {
                         QuotaExceeded = true,
-                        ErrorMessage = $"Rate limit or quota reached on Google Translate ({response.StatusCode})."
+                        ErrorMessage = $"Rate limit or quota reached on translation service ({response.StatusCode})."
                     };
                 }
 
                 response.EnsureSuccessStatusCode();
                 string json = await response.Content.ReadAsStringAsync();
+
+                if (string.IsNullOrWhiteSpace(json))
+                {
+                    return new SingleTranslationResult
+                    {
+                        ErrorMessage = "Translation service returned an empty response."
+                    };
+                }
+
+                string trimmed = json.TrimStart();
+                if (trimmed.StartsWith("<", StringComparison.Ordinal) || trimmed.StartsWith("<!doctype", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new SingleTranslationResult
+                    {
+                        QuotaExceeded = true,
+                        ErrorMessage = "Google Translate rate limit or automated query challenge triggered (HTML response received)."
+                    };
+                }
+
                 string translatedCore = ExtractGoogleTranslateText(json);
 
                 if (string.IsNullOrEmpty(translatedCore))
                 {
-                    translatedCore = core;
+                    return new SingleTranslationResult
+                    {
+                        ErrorMessage = "Unable to parse translated text from translation service response."
+                    };
                 }
 
                 translatedLines.Add(leadWs + translatedCore + trailWs);

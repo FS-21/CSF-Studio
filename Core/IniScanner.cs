@@ -14,7 +14,12 @@ namespace CsfStudio.Core
         public string IniSection { get; set; }
         public string IniPropertyName { get; set; }
         public bool ExistsInCsf { get; set; }
+        public bool ExistsInRefCsf { get; set; }
         public bool IsNostrInline { get; set; }
+        public string NostrValue { get; set; }
+        public string InlineComment { get; set; }
+        public string CandidateKey { get; set; }
+        public string RawLine { get; set; }
     }
 
     public static class IniScanner
@@ -30,12 +35,15 @@ namespace CsfStudio.Core
 
             string line = rawLine.Trim();
 
-            // Strip inline comments starting with ';' or '#'
+            // Strip inline comments starting with ';', '#' or '//'
             int semiIdx = line.IndexOf(';');
             if (semiIdx >= 0) line = line.Substring(0, semiIdx).Trim();
 
             int hashIdx = line.IndexOf('#');
             if (hashIdx >= 0) line = line.Substring(0, hashIdx).Trim();
+
+            int slashIdx = line.IndexOf("//", StringComparison.Ordinal);
+            if (slashIdx >= 0) line = line.Substring(0, slashIdx).Trim();
 
             return line;
         }
@@ -132,6 +140,58 @@ namespace CsfStudio.Core
                     }
 
                     bool isNostr = propVal.StartsWith("NOSTR:", StringComparison.OrdinalIgnoreCase);
+                    string nostrVal = null;
+                    string inlineComment = null;
+                    string candidateKey = null;
+
+                    // Extract inline comment if any (; # or //)
+                    int commentIdx = rawLine.IndexOfAny(new[] { ';', '#' });
+                    int doubleSlashIdx = rawLine.IndexOf("//", StringComparison.Ordinal);
+                    if (commentIdx < 0 || (doubleSlashIdx >= 0 && doubleSlashIdx < commentIdx))
+                    {
+                        commentIdx = doubleSlashIdx;
+                    }
+                    if (commentIdx >= 0)
+                    {
+                        int prefixLen = (rawLine.Length > commentIdx + 1 && rawLine[commentIdx] == '/' && rawLine[commentIdx + 1] == '/') ? 2 : 1;
+                        inlineComment = rawLine.Substring(commentIdx + prefixLen).Trim();
+                    }
+
+                    if (isNostr)
+                    {
+                        nostrVal = propVal.Substring(6).Trim().Trim('"', '\'');
+
+                        // Check if comment explicitly contains a key reference, e.g. "Name:ROBOTBASILISK" or "[Name:ROBOTBASILISK]"
+                        if (!string.IsNullOrWhiteSpace(inlineComment))
+                        {
+                            var tokenMatch = Regex.Match(inlineComment, @"(?i)(?:Name:|UID:|CSF:|GUI:|TXT:)[A-Za-z0-9_:\.\-]+");
+                            if (tokenMatch.Success)
+                            {
+                                candidateKey = tokenMatch.Value.Trim();
+                            }
+                            else
+                            {
+                                var bracketMatch = Regex.Match(inlineComment, @"\[([A-Za-z0-9_:\.\-]+)\]");
+                                if (bracketMatch.Success)
+                                {
+                                    candidateKey = bracketMatch.Groups[1].Value.Trim();
+                                }
+                            }
+                        }
+
+                        if (string.IsNullOrWhiteSpace(candidateKey))
+                        {
+                            bool hasSection = !string.IsNullOrWhiteSpace(currentSection) && !string.Equals(currentSection, "General", StringComparison.OrdinalIgnoreCase);
+                            if (string.Equals(propName, "UIName", StringComparison.OrdinalIgnoreCase) || string.Equals(propName, "Name", StringComparison.OrdinalIgnoreCase))
+                                candidateKey = hasSection ? $"Name:{currentSection}" : "Name:UNKNOWN";
+                            else if (string.Equals(propName, "UIDescription", StringComparison.OrdinalIgnoreCase))
+                                candidateKey = hasSection ? $"UID:{currentSection}" : "UID:UNKNOWN";
+                            else if (hasSection)
+                                candidateKey = $"{currentSection}_{propName}";
+                            else
+                                candidateKey = propName;
+                        }
+                    }
 
                     string uniqueToken = $"{currentSection}:{propName}:{propVal}";
                     if (!seenKeys.Contains(uniqueToken))
@@ -145,7 +205,11 @@ namespace CsfStudio.Core
                             IniSection = currentSection,
                             IniPropertyName = propName,
                             ExistsInCsf = isNostr || existingKeys.Contains(propVal),
-                            IsNostrInline = isNostr
+                            IsNostrInline = isNostr,
+                            NostrValue = nostrVal,
+                            InlineComment = inlineComment,
+                            CandidateKey = candidateKey,
+                            RawLine = rawLine.Trim()
                         });
                     }
                 }

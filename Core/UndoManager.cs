@@ -170,6 +170,21 @@ namespace CsfStudio.Core
 
         public void Undo(CsfSession session)
         {
+            if (!string.IsNullOrEmpty(TargetLanguageTag))
+            {
+                var sDoc = session.Documents.FirstOrDefault(d => string.Equals(d.LanguageTag, TargetLanguageTag, StringComparison.OrdinalIgnoreCase));
+                if (sDoc != null)
+                {
+                    var lbl = sDoc.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, TargetKeyName, StringComparison.OrdinalIgnoreCase));
+                    if (lbl != null)
+                    {
+                        sDoc.Document.Labels.Remove(lbl);
+                        sDoc.IsModified = true;
+                    }
+                }
+                return;
+            }
+
             foreach (var sDoc in session.Documents)
             {
                 var lbl = sDoc.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, TargetKeyName, StringComparison.OrdinalIgnoreCase));
@@ -183,6 +198,21 @@ namespace CsfStudio.Core
 
         public void Redo(CsfSession session)
         {
+            if (!string.IsNullOrEmpty(TargetLanguageTag))
+            {
+                var sDoc = session.Documents.FirstOrDefault(d => string.Equals(d.LanguageTag, TargetLanguageTag, StringComparison.OrdinalIgnoreCase));
+                if (sDoc != null)
+                {
+                    var lbl = sDoc.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, TargetKeyName, StringComparison.OrdinalIgnoreCase));
+                    if (lbl == null)
+                    {
+                        sDoc.Document.Labels.Add(new CsfLabel(TargetKeyName, string.Empty));
+                        sDoc.IsModified = true;
+                    }
+                }
+                return;
+            }
+
             foreach (var sDoc in session.Documents)
             {
                 var lbl = sDoc.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, TargetKeyName, StringComparison.OrdinalIgnoreCase));

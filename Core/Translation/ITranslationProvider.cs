@@ -11,6 +11,7 @@ namespace CsfStudio.Core.Translation
         public string ExtraWav { get; set; }
         public string TranslatedText { get; set; }
         public string ErrorMessage { get; set; }
+        public System.Action<TranslationItem> OnCompleted { get; set; }
     }
 
     public class TranslationBatchResult

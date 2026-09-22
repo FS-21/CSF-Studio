@@ -74,6 +74,7 @@ namespace CsfStudio.Core.Translation
                         if (translations[i] is Dictionary<string, object> itemDict && itemDict.TryGetValue("text", out object textVal))
                         {
                             items[i].TranslatedText = textVal?.ToString();
+                            try { items[i].OnCompleted?.Invoke(items[i]); } catch { }
                         }
                     }
                 }

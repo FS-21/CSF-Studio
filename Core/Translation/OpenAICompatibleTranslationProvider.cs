@@ -122,6 +122,7 @@ namespace CsfStudio.Core.Translation
                                     if (item.Key != null && translatedDict.TryGetValue(item.Key, out string trans))
                                     {
                                         item.TranslatedText = trans;
+                                        try { item.OnCompleted?.Invoke(item); } catch { }
                                     }
                                 }
                             }

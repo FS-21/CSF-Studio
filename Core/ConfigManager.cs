@@ -68,6 +68,8 @@ namespace CsfStudio.Core
 
         // INI Scanner Settings
         public string IniScanProperties { get; set; } = "UIName;EnemyUIName;WeaponUIName;UIDescription;BuildText;LoadScreenText;Briefing;WinText;LoseText;Text;Message;ToolTip;HarvesterCounter.Label;CostLabel;PowerLabel;PowerBlackoutLabel;TimeLabel;SWShotsFormat;Ranking;ShowBriefingResumeButton;CSF";
+        public string LastIniScanReferenceCsfPath { get; set; } = string.Empty;
+        public List<string> LastIniScanFiles { get; set; } = new List<string>();
 
         // Undo Settings
         public int MaxUndoLevels { get; set; } = 100;
@@ -236,6 +238,8 @@ namespace CsfStudio.Core
 
                         case "IniScannerSettings":
                             if (key == "IniScanProperties" && !string.IsNullOrWhiteSpace(val)) config.IniScanProperties = val;
+                            else if (key == "ReferenceCsfPath") config.LastIniScanReferenceCsfPath = val;
+                            else if (key == "ScannedIniFiles") config.LastIniScanFiles = val.Split(new[] { "|||" }, StringSplitOptions.RemoveEmptyEntries).Select(s => s.Trim()).Where(s => !string.IsNullOrEmpty(s)).ToList();
                             break;
 
                         case "UndoSettings":
@@ -423,6 +427,12 @@ namespace CsfStudio.Core
             sb.AppendLine("; Semicolon-separated list of .INI and .MAP property tag names scanned for CSF string key references.");
             sb.AppendLine("; Type: String (Semicolon-delimited list)");
             sb.AppendLine($"IniScanProperties={config.IniScanProperties}");
+            sb.AppendLine("; File path to base game reference CSF used to filter out already existing native keys (e.g. ra2.csf).");
+            sb.AppendLine("; Type: Path (File Path String)");
+            sb.AppendLine($"ReferenceCsfPath={config.LastIniScanReferenceCsfPath ?? ""}");
+            sb.AppendLine("; Pipe-delimited list of last scanned mod INI/MAP file paths.");
+            sb.AppendLine("; Type: String (Pipe-delimited list)");
+            sb.AppendLine($"ScannedIniFiles={(config.LastIniScanFiles != null ? string.Join("|||", config.LastIniScanFiles) : "")}");
             sb.AppendLine();
 
             sb.AppendLine("[UndoSettings]");

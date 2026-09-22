@@ -4,7 +4,9 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
+using Timer = System.Windows.Forms.Timer;
 using System.Windows.Forms;
 using CsfStudio.Core;
 using CsfStudio.Core.Translation;
@@ -292,6 +294,7 @@ namespace CsfStudio.UI
             EnableDoubleBuffering(tabControlMain);
             EnableDoubleBuffering(tabMaster);
             EnableDoubleBuffering(tabCoverage);
+            EnableDoubleBuffering(pnlCoverageHeader);
             EnableDoubleBuffering(tabKeyEditor);
             EnableDoubleBuffering(tabUnsaved);
             EnableDoubleBuffering(tabRecent);
@@ -934,6 +937,14 @@ namespace CsfStudio.UI
                 var dlgRes = scanDlg.ShowDialog(this);
                 if (dlgRes == DialogResult.OK || scanDlg.AnyKeysAdded)
                 {
+                    if (scanDlg.NewlyAddedKeys != null && scanDlg.NewlyAddedKeys.Count > 0)
+                    {
+                        foreach (var key in scanDlg.NewlyAddedKeys)
+                        {
+                            MarkKeyAsCreated(key);
+                        }
+                    }
+
                     UpdateUIForSessionMode();
                     RebuildCategoryTreeAndGrid();
                     PopulateMasterGrid();
@@ -2624,7 +2635,7 @@ namespace CsfStudio.UI
             bool hasValFilter = !string.IsNullOrEmpty(searchValue) && (!_valRegexMode || !valRegexInvalid);
 
             int statusFilterIdx = cboStatusFilter != null ? cboStatusFilter.SelectedIndex : 0;
-            // 0 = All, 1 = Missing, 2 = Empty, 3 = Complete
+            // 0 = All, 1 = Missing, 2 = Empty, 3 = Complete, 4 = Modified
             bool isSingleDocFocused = !_session.IsSingleFileMode && (cboFileFilter?.SelectedItem is DocumentFilterOption opt && opt.Document != null);
             CsfSessionDocument focusedDoc = isSingleDocFocused ? ((DocumentFilterOption)cboFileFilter.SelectedItem).Document : null;
 
@@ -2633,7 +2644,23 @@ namespace CsfStudio.UI
             {
                 if (statusFilterIdx > 0)
                 {
-                    if (isSingleDocFocused && focusedDoc != null)
+                    if (statusFilterIdx == 4)
+                    {
+                        bool isMod = _addedKeyNames.Contains(row.KeyName);
+                        if (!isMod)
+                        {
+                            if (isSingleDocFocused && focusedDoc != null)
+                            {
+                                isMod = _modifiedKeyMap.TryGetValue(focusedDoc.LanguageTag, out var modSet) && modSet.Contains(row.KeyName);
+                            }
+                            else
+                            {
+                                isMod = _modifiedKeyNames.Contains(row.KeyName);
+                            }
+                        }
+                        if (!isMod) return false;
+                    }
+                    else if (isSingleDocFocused && focusedDoc != null)
                     {
                         bool existsInFocused = row.ValuesPerLanguage.TryGetValue(focusedDoc.LanguageTag, out var ent) && ent != null;
                         bool hasTextInFocused = existsInFocused && !string.IsNullOrEmpty(ent.Value);
@@ -4259,6 +4286,13 @@ namespace CsfStudio.UI
         private CheckBox _chkShowEmptyEntries = null;
         private Label _lblCoverageFilterInfo = null;
         private string _selectedCoverageFilterFileTag = null;
+        private FlowLayoutPanel _coverageFlowCards = null;
+        private Panel _coverageSubHeader = null;
+        private readonly Dictionary<string, (GroupBox card, ProgressBar bar, Label stats)> _coverageCardControls = new Dictionary<string, (GroupBox, ProgressBar, Label)>(StringComparer.OrdinalIgnoreCase);
+        private CancellationTokenSource _batchTranslationCts = null;
+        private bool _isBatchTranslating = false;
+        private ToolStripProgressBar _statusProgressBar = null;
+        private ToolStripButton _btnStatusCancel = null;
 
         private void PopulateCoverageMatrixTab(List<MasterKeyRow> masterRows = null)
         {
@@ -4272,9 +4306,6 @@ namespace CsfStudio.UI
                 pnlCoverageHeader.Width = 245;
                 pnlCoverageHeader.AutoScroll = true;
                 gridCoverage.Dock = DockStyle.Fill;
-
-                pnlCoverageHeader.Controls.Clear();
-                gridCoverage.Rows.Clear();
 
                 if (masterRows == null)
                 {
@@ -4341,122 +4372,202 @@ namespace CsfStudio.UI
 
                 int totalKeysEvaluated = evaluatedMasterRows.Count;
 
-                var flowCards = new FlowLayoutPanel
+                bool canReuseCards = _coverageFlowCards != null &&
+                                     _coverageSubHeader != null &&
+                                     _coverageFlowCards.Parent == pnlCoverageHeader &&
+                                     _coverageSubHeader.Parent == pnlCoverageHeader &&
+                                     _session != null &&
+                                     _session.Documents != null &&
+                                     _coverageCardControls.Count == _session.Documents.Count &&
+                                     _session.Documents.All(d => _coverageCardControls.ContainsKey(d.LanguageTag));
+
+                if (canReuseCards)
                 {
-                    Dock = DockStyle.Top,
-                    AutoSize = true,
-                    AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                    WrapContents = false,
-                    FlowDirection = FlowDirection.TopDown,
-                    Padding = new Padding(6),
-                    BackColor = Color.FromArgb(245, 247, 250)
-                };
-
-                foreach (var sDoc in _session.Documents)
-                {
-                    string langTag = sDoc.LanguageTag;
-                    int presentCount = evaluatedMasterRows.Count(r => r.ValuesPerLanguage.TryGetValue(langTag, out var v) && !string.IsNullOrEmpty(v?.Value));
-                    int missingCount = totalKeysEvaluated - presentCount;
-                    double pct = totalKeysEvaluated > 0 ? (presentCount * 100.0) / totalKeysEvaluated : 100.0;
-                    bool isFilterActive = string.Equals(_selectedCoverageFilterFileTag, langTag, StringComparison.OrdinalIgnoreCase);
-
-                    string filterPrefix = LanguageManager.GetString("Coverage.FilterPrefixFormat", "🔍 FILTER: {0}");
-                    string baseTagStr = LanguageManager.GetString("Coverage.BaseCsfTag", "📌 Base CSF");
-                    string cardTitle = isFilterActive
-                        ? string.Format(filterPrefix, langTag)
-                        : $"{langTag} {(sDoc == _session.BaseDocument ? baseTagStr : "")}";
-
-                    var grpCard = new GroupBox
+                    foreach (var sDoc in _session.Documents)
                     {
-                        Text = cardTitle,
-                        Size = new Size(215, 68),
-                        Margin = new Padding(4),
-                        Cursor = Cursors.Hand,
-                        BackColor = isFilterActive ? Color.FromArgb(210, 232, 255) : Color.White,
-                        Font = new Font(FontFamily.GenericSansSerif, 8.5f, isFilterActive ? FontStyle.Bold : FontStyle.Regular)
-                    };
+                        string langTag = sDoc.LanguageTag;
+                        int presentCount = evaluatedMasterRows.Count(r => r.ValuesPerLanguage.TryGetValue(langTag, out var v) && !string.IsNullOrEmpty(v?.Value));
+                        int missingCount = totalKeysEvaluated - presentCount;
+                        double pct = totalKeysEvaluated > 0 ? (presentCount * 100.0) / totalKeysEvaluated : 100.0;
+                        bool isFilterActive = string.Equals(_selectedCoverageFilterFileTag, langTag, StringComparison.OrdinalIgnoreCase);
 
-                    var pBar = new ProgressBar
-                    {
-                        Location = new Point(10, 20),
-                        Size = new Size(195, 16),
-                        Minimum = 0,
-                        Maximum = 100,
-                        Value = Math.Max(0, Math.Min(100, (int)pct)),
-                        Cursor = Cursors.Hand
-                    };
+                        string filterPrefix = LanguageManager.GetString("Coverage.FilterPrefixFormat", "🔍 FILTER: {0}");
+                        string baseTagStr = LanguageManager.GetString("Coverage.BaseCsfTag", "📌 Base CSF");
+                        string cardTitle = isFilterActive
+                            ? string.Format(filterPrefix, langTag)
+                            : $"{langTag} {(sDoc == _session.BaseDocument ? baseTagStr : "")}";
 
-                    string statsFormat = LanguageManager.GetString("Coverage.StatsFormat", "{0}/{1} ({2:F1}%) | Missing: {3}");
-                    var lblStats = new Label
-                    {
-                        Text = string.Format(statsFormat, presentCount, totalKeysEvaluated, pct, missingCount),
-                        Location = new Point(10, 42),
-                        AutoSize = true,
-                        ForeColor = missingCount > 0 ? Color.DarkRed : Color.DarkGreen,
-                        Cursor = Cursors.Hand
-                    };
-
-                    string cardTip = string.Format(LanguageManager.GetString("ToolTip.Coverage.LanguageCard", "Language Coverage: Click this card to filter and display only keys that are missing or empty in '{0}'. Click again to remove the filter."), langTag);
-                    ToolTipHelper.SetToolTip(_toolTip, grpCard, cardTip);
-                    ToolTipHelper.SetToolTip(_toolTip, pBar, cardTip);
-                    ToolTipHelper.SetToolTip(_toolTip, lblStats, cardTip);
-
-                    void ToggleFilter(object sender, EventArgs args)
-                    {
-                        if (string.Equals(_selectedCoverageFilterFileTag, langTag, StringComparison.OrdinalIgnoreCase))
+                        if (_coverageCardControls.TryGetValue(langTag, out var cardTuple))
                         {
-                            _selectedCoverageFilterFileTag = null;
+                            cardTuple.card.Text = cardTitle;
+                            cardTuple.card.BackColor = isFilterActive ? Color.FromArgb(210, 232, 255) : Color.White;
+                            cardTuple.card.Font = new Font(FontFamily.GenericSansSerif, 8.5f, isFilterActive ? FontStyle.Bold : FontStyle.Regular);
+                            cardTuple.bar.Value = Math.Max(0, Math.Min(100, (int)pct));
+
+                            string statsFormat = LanguageManager.GetString("Coverage.StatsFormat", "{0}/{1} ({2:F1}%) | Missing: {3}");
+                            cardTuple.stats.Text = string.Format(statsFormat, presentCount, totalKeysEvaluated, pct, missingCount);
+                            cardTuple.stats.ForeColor = missingCount > 0 ? Color.DarkRed : Color.DarkGreen;
                         }
-                        else
-                        {
-                            _selectedCoverageFilterFileTag = langTag;
-                        }
-                        PopulateCoverageMatrixTab();
                     }
 
-                    grpCard.Click += ToggleFilter;
-                    pBar.Click += ToggleFilter;
-                    lblStats.Click += ToggleFilter;
-
-                    grpCard.Controls.Add(pBar);
-                    grpCard.Controls.Add(lblStats);
-                    flowCards.Controls.Add(grpCard);
-                }
-
-                var pnlSubHeader = new Panel
-                {
-                    Dock = DockStyle.Top,
-                    Height = 85,
-                    Padding = new Padding(8, 6, 8, 6),
-                    BackColor = Color.FromArgb(238, 242, 248)
-                };
-
-                _chkShowFullCoverage.Location = new Point(8, 6);
-                _chkShowEmptyEntries.Location = new Point(8, 28);
-                pnlSubHeader.Controls.Add(_chkShowFullCoverage);
-                pnlSubHeader.Controls.Add(_chkShowEmptyEntries);
-
-                if (_lblCoverageFilterInfo == null)
-                {
-                    _lblCoverageFilterInfo = new Label
+                    if (!string.IsNullOrEmpty(_selectedCoverageFilterFileTag))
                     {
-                        AutoSize = true,
-                        Font = new Font(FontFamily.GenericSansSerif, 8.25f, FontStyle.Bold),
-                        ForeColor = Color.DarkBlue
-                    };
+                        if (_lblCoverageFilterInfo == null)
+                        {
+                            _lblCoverageFilterInfo = new Label
+                            {
+                                AutoSize = true,
+                                Font = new Font(FontFamily.GenericSansSerif, 8.25f, FontStyle.Bold),
+                                ForeColor = Color.DarkBlue
+                            };
+                        }
+                        _lblCoverageFilterInfo.Text = string.Format(LanguageManager.GetString("Coverage.MissingInTagFormat", "🔍 Missing in '{0}'"), _selectedCoverageFilterFileTag);
+                        _lblCoverageFilterInfo.Location = new Point(8, 54);
+                        string activeFilterTip = string.Format(LanguageManager.GetString("ToolTip.Coverage.FilterActive", "Active Filter: Currently displaying only keys that are missing or incomplete in '{0}'. Click the language card above to clear this filter."), _selectedCoverageFilterFileTag);
+                        ToolTipHelper.SetToolTip(_toolTip, _lblCoverageFilterInfo, activeFilterTip);
+                        if (!_coverageSubHeader.Controls.Contains(_lblCoverageFilterInfo))
+                        {
+                            _coverageSubHeader.Controls.Add(_lblCoverageFilterInfo);
+                        }
+                        _lblCoverageFilterInfo.Visible = true;
+                    }
+                    else if (_lblCoverageFilterInfo != null)
+                    {
+                        _lblCoverageFilterInfo.Visible = false;
+                    }
                 }
-
-                if (!string.IsNullOrEmpty(_selectedCoverageFilterFileTag))
+                else
                 {
-                    _lblCoverageFilterInfo.Text = string.Format(LanguageManager.GetString("Coverage.MissingInTagFormat", "🔍 Missing in '{0}'"), _selectedCoverageFilterFileTag);
-                    _lblCoverageFilterInfo.Location = new Point(8, 54);
-                    string activeFilterTip = string.Format(LanguageManager.GetString("ToolTip.Coverage.FilterActive", "Active Filter: Currently displaying only keys that are missing or incomplete in '{0}'. Click the language card above to clear this filter."), _selectedCoverageFilterFileTag);
-                    ToolTipHelper.SetToolTip(_toolTip, _lblCoverageFilterInfo, activeFilterTip);
-                    pnlSubHeader.Controls.Add(_lblCoverageFilterInfo);
-                }
+                    pnlCoverageHeader.SuspendLayout();
+                    pnlCoverageHeader.Controls.Clear();
+                    _coverageCardControls.Clear();
 
-                pnlCoverageHeader.Controls.Add(flowCards);
-                pnlCoverageHeader.Controls.Add(pnlSubHeader);
+                    _coverageFlowCards = new FlowLayoutPanel
+                    {
+                        Dock = DockStyle.Top,
+                        AutoSize = true,
+                        AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                        WrapContents = false,
+                        FlowDirection = FlowDirection.TopDown,
+                        Padding = new Padding(6),
+                        BackColor = Color.FromArgb(245, 247, 250)
+                    };
+                    EnableDoubleBuffering(_coverageFlowCards);
+
+                    foreach (var sDoc in _session.Documents)
+                    {
+                        string langTag = sDoc.LanguageTag;
+                        int presentCount = evaluatedMasterRows.Count(r => r.ValuesPerLanguage.TryGetValue(langTag, out var v) && !string.IsNullOrEmpty(v?.Value));
+                        int missingCount = totalKeysEvaluated - presentCount;
+                        double pct = totalKeysEvaluated > 0 ? (presentCount * 100.0) / totalKeysEvaluated : 100.0;
+                        bool isFilterActive = string.Equals(_selectedCoverageFilterFileTag, langTag, StringComparison.OrdinalIgnoreCase);
+
+                        string filterPrefix = LanguageManager.GetString("Coverage.FilterPrefixFormat", "🔍 FILTER: {0}");
+                        string baseTagStr = LanguageManager.GetString("Coverage.BaseCsfTag", "📌 Base CSF");
+                        string cardTitle = isFilterActive
+                            ? string.Format(filterPrefix, langTag)
+                            : $"{langTag} {(sDoc == _session.BaseDocument ? baseTagStr : "")}";
+
+                        var grpCard = new GroupBox
+                        {
+                            Text = cardTitle,
+                            Size = new Size(215, 68),
+                            Margin = new Padding(4),
+                            Cursor = Cursors.Hand,
+                            BackColor = isFilterActive ? Color.FromArgb(210, 232, 255) : Color.White,
+                            Font = new Font(FontFamily.GenericSansSerif, 8.5f, isFilterActive ? FontStyle.Bold : FontStyle.Regular)
+                        };
+
+                        var pBar = new ProgressBar
+                        {
+                            Location = new Point(10, 20),
+                            Size = new Size(195, 16),
+                            Minimum = 0,
+                            Maximum = 100,
+                            Value = Math.Max(0, Math.Min(100, (int)pct)),
+                            Cursor = Cursors.Hand
+                        };
+
+                        string statsFormat = LanguageManager.GetString("Coverage.StatsFormat", "{0}/{1} ({2:F1}%) | Missing: {3}");
+                        var lblStats = new Label
+                        {
+                            Text = string.Format(statsFormat, presentCount, totalKeysEvaluated, pct, missingCount),
+                            Location = new Point(10, 42),
+                            AutoSize = true,
+                            ForeColor = missingCount > 0 ? Color.DarkRed : Color.DarkGreen,
+                            Cursor = Cursors.Hand
+                        };
+
+                        string cardTip = string.Format(LanguageManager.GetString("ToolTip.Coverage.LanguageCard", "Language Coverage: Click this card to filter and display only keys that are missing or empty in '{0}'. Click again to remove the filter."), langTag);
+                        ToolTipHelper.SetToolTip(_toolTip, grpCard, cardTip);
+                        ToolTipHelper.SetToolTip(_toolTip, pBar, cardTip);
+                        ToolTipHelper.SetToolTip(_toolTip, lblStats, cardTip);
+
+                        void ToggleFilter(object sender, EventArgs args)
+                        {
+                            if (string.Equals(_selectedCoverageFilterFileTag, langTag, StringComparison.OrdinalIgnoreCase))
+                            {
+                                _selectedCoverageFilterFileTag = null;
+                            }
+                            else
+                            {
+                                _selectedCoverageFilterFileTag = langTag;
+                            }
+                            PopulateCoverageMatrixTab();
+                        }
+
+                        grpCard.Click += ToggleFilter;
+                        pBar.Click += ToggleFilter;
+                        lblStats.Click += ToggleFilter;
+
+                        grpCard.Controls.Add(pBar);
+                        grpCard.Controls.Add(lblStats);
+                        _coverageFlowCards.Controls.Add(grpCard);
+                        _coverageCardControls[langTag] = (grpCard, pBar, lblStats);
+                    }
+
+                    _coverageSubHeader = new Panel
+                    {
+                        Dock = DockStyle.Top,
+                        Height = 85,
+                        Padding = new Padding(8, 6, 8, 6),
+                        BackColor = Color.FromArgb(238, 242, 248)
+                    };
+                    EnableDoubleBuffering(_coverageSubHeader);
+
+                    _chkShowFullCoverage.Location = new Point(8, 6);
+                    _chkShowEmptyEntries.Location = new Point(8, 28);
+                    _coverageSubHeader.Controls.Add(_chkShowFullCoverage);
+                    _coverageSubHeader.Controls.Add(_chkShowEmptyEntries);
+
+                    if (_lblCoverageFilterInfo == null)
+                    {
+                        _lblCoverageFilterInfo = new Label
+                        {
+                            AutoSize = true,
+                            Font = new Font(FontFamily.GenericSansSerif, 8.25f, FontStyle.Bold),
+                            ForeColor = Color.DarkBlue
+                        };
+                    }
+
+                    if (!string.IsNullOrEmpty(_selectedCoverageFilterFileTag))
+                    {
+                        _lblCoverageFilterInfo.Text = string.Format(LanguageManager.GetString("Coverage.MissingInTagFormat", "🔍 Missing in '{0}'"), _selectedCoverageFilterFileTag);
+                        _lblCoverageFilterInfo.Location = new Point(8, 54);
+                        string activeFilterTip = string.Format(LanguageManager.GetString("ToolTip.Coverage.FilterActive", "Active Filter: Currently displaying only keys that are missing or incomplete in '{0}'. Click the language card above to clear this filter."), _selectedCoverageFilterFileTag);
+                        ToolTipHelper.SetToolTip(_toolTip, _lblCoverageFilterInfo, activeFilterTip);
+                        _coverageSubHeader.Controls.Add(_lblCoverageFilterInfo);
+                        _lblCoverageFilterInfo.Visible = true;
+                    }
+                    else
+                    {
+                        _lblCoverageFilterInfo.Visible = false;
+                    }
+
+                    pnlCoverageHeader.Controls.Add(_coverageFlowCards);
+                    pnlCoverageHeader.Controls.Add(_coverageSubHeader);
+                    pnlCoverageHeader.ResumeLayout(true);
+                }
 
                 var baseDoc = _session.BaseDocument ?? _session.Documents.FirstOrDefault();
                 string baseTag = baseDoc != null ? baseDoc.LanguageTag : string.Empty;
@@ -4530,7 +4641,16 @@ namespace CsfStudio.UI
                     coverageGridRows.Add(gRow);
                 }
 
-                gridCoverage.Rows.AddRange(coverageGridRows.ToArray());
+                gridCoverage.SuspendLayout();
+                try
+                {
+                    gridCoverage.Rows.Clear();
+                    gridCoverage.Rows.AddRange(coverageGridRows.ToArray());
+                }
+                finally
+                {
+                    gridCoverage.ResumeLayout();
+                }
                 gridCoverage.ClearSelection();
                 gridCoverage.CurrentCell = null;
 
@@ -4590,6 +4710,7 @@ namespace CsfStudio.UI
             };
             lstKeyEditorKeys.DrawItem += LstKeyEditorKeys_DrawItem;
             lstKeyEditorKeys.SelectedIndexChanged += (s, e) => OnKeyEditorSelectionChanged();
+            if (_gridContextMenu != null) lstKeyEditorKeys.ContextMenuStrip = _gridContextMenu;
 
             splitKeyEditor.Panel1.Controls.Add(lstKeyEditorKeys);
 
@@ -7346,22 +7467,24 @@ namespace CsfStudio.UI
         {
             if (sDoc == null || sDoc.Document == null) return;
 
-            var selectedKeys = explicitSelectedKeys ?? GetCurrentlySelectedKeyNames();
+            var selectedKeys = (explicitSelectedKeys != null && explicitSelectedKeys.Count > 0) ? explicitSelectedKeys : null;
 
             using (var dlg = new SaveFileDialog())
             {
                 dlg.Filter = LanguageManager.GetString("Filter.TxtUtf8Only", "Plain Text UTF-8 (*.txt)|*.txt");
-                dlg.Title = selectedKeys != null && selectedKeys.Count > 0
-                    ? string.Format(LanguageManager.GetString("MainForm.ExportSelectedTitleFormat", "Export {0} Selected Keys from [{1}] to Plain Text UTF-8"), selectedKeys.Count, sDoc.LanguageTag)
-                    : string.Format(LanguageManager.GetString("MainForm.ExportAllTitleFormat", "Export All Keys from [{1}] to Plain Text UTF-8"), sDoc.LanguageTag);
+                dlg.Title = selectedKeys != null
+                    ? LanguageManager.GetStringFormat("MainForm.ExportSelectedTitleFormat", "Export {0} Selected Keys from [{1}] to Plain Text UTF-8", selectedKeys.Count, sDoc.LanguageTag)
+                    : LanguageManager.GetStringFormat("MainForm.ExportAllTitleFormat", "Export All Keys from [{0}] to Plain Text UTF-8", sDoc.LanguageTag);
                 dlg.FileName = Path.GetFileNameWithoutExtension(sDoc.FileName) + ".txt";
+                InitFileDialogDirectory(dlg);
 
                 if (dlg.ShowDialog() == DialogResult.OK)
                 {
+                    SaveLastOpenDirectory(dlg.FileName);
                     CsfTxtExporterImporter.ExportToTxt(sDoc.Document, dlg.FileName, selectedKeys);
-                    string msg = selectedKeys != null && selectedKeys.Count > 0
-                        ? string.Format(LanguageManager.GetString("Msg.ExportSelectedSuccessFormat", "Successfully exported {0} selected keys from [{1}] to plain text."), selectedKeys.Count, sDoc.LanguageTag)
-                        : string.Format(LanguageManager.GetString("Msg.ExportAllSuccessFormat", "Successfully exported all {0} keys from [{1}] to plain text."), sDoc.Document.Labels.Count, sDoc.LanguageTag);
+                    string msg = selectedKeys != null
+                        ? LanguageManager.GetStringFormat("Msg.ExportSelectedSuccessFormat", "Successfully exported {0} selected keys from [{1}] to plain text.", selectedKeys.Count, sDoc.LanguageTag)
+                        : LanguageManager.GetStringFormat("Msg.ExportAllSuccessFormat", "Successfully exported all {0} keys from [{1}] to plain text.", sDoc.Document.Labels.Count, sDoc.LanguageTag);
                     MessageBox.Show(
                         msg,
                         LanguageManager.GetString("Title.ExportSuccess", "Export Success"),
@@ -7378,7 +7501,7 @@ namespace CsfStudio.UI
             using (var dlg = new OpenFileDialog())
             {
                 dlg.Filter = LanguageManager.GetString("Filter.TxtUtf8Only", "Plain Text UTF-8 (*.txt)|*.txt");
-                dlg.Title = string.Format(LanguageManager.GetString("MainForm.ImportTxtTitleFormat", "Import Plain Text UTF-8 into [{0}]"), sDoc.LanguageTag);
+                dlg.Title = LanguageManager.GetStringFormat("MainForm.ImportTxtTitleFormat", "Import Plain Text UTF-8 into [{0}]", sDoc.LanguageTag);
                 InitFileDialogDirectory(dlg);
                 if (dlg.ShowDialog() == DialogResult.OK)
                 {
@@ -7388,21 +7511,21 @@ namespace CsfStudio.UI
             }
         }
 
-        private void PerformExportKeyStructureForDoc(CsfSessionDocument sDoc)
+        private void PerformExportKeyStructureForDoc(CsfSessionDocument sDoc, List<string> explicitSelectedKeys = null)
         {
             if (sDoc == null || sDoc.Document == null) return;
 
-            var selectedKeys = GetCurrentlySelectedKeyNames();
-            var keysToExport = selectedKeys != null && selectedKeys.Count > 0
+            var selectedKeys = (explicitSelectedKeys != null && explicitSelectedKeys.Count > 0) ? explicitSelectedKeys : null;
+            var keysToExport = selectedKeys != null
                 ? selectedKeys
                 : sDoc.Document.Labels.Select(l => l.Name).ToList();
 
             using (var dlg = new SaveFileDialog())
             {
                 dlg.Filter = LanguageManager.GetString("Filter.TxtUtf8Only", "Plain Text UTF-8 (*.txt)|*.txt");
-                dlg.Title = selectedKeys != null && selectedKeys.Count > 0
-                    ? string.Format(LanguageManager.GetString("MainForm.ExportSelectedKeysTitleFormat", "Export {0} Selected Key Names Only from [{1}] to Plain Text UTF-8"), selectedKeys.Count, sDoc.LanguageTag)
-                    : string.Format(LanguageManager.GetString("MainForm.ExportAllKeysTitleFormat", "Export All Key Names Only from [{0}] to Plain Text UTF-8"), sDoc.LanguageTag);
+                dlg.Title = selectedKeys != null
+                    ? LanguageManager.GetStringFormat("MainForm.ExportSelectedKeysTitleFormat", "Export {0} Selected Key Names Only from [{1}] to Plain Text UTF-8", selectedKeys.Count, sDoc.LanguageTag)
+                    : LanguageManager.GetStringFormat("MainForm.ExportAllKeysTitleFormat", "Export All Key Names Only from [{0}] to Plain Text UTF-8", sDoc.LanguageTag);
                 dlg.FileName = Path.GetFileNameWithoutExtension(sDoc.FileName) + "_KeysOnly.txt";
                 InitFileDialogDirectory(dlg);
 
@@ -7410,9 +7533,9 @@ namespace CsfStudio.UI
                 {
                     SaveLastOpenDirectory(dlg.FileName);
                     CsfTxtExporterImporter.ExportKeyStructureToTxt(keysToExport, dlg.FileName);
-                    string msg = selectedKeys != null && selectedKeys.Count > 0
-                        ? string.Format(LanguageManager.GetString("Msg.ExportSelectedKeysSuccessFormat", "Successfully exported {0} selected key names to plain text."), selectedKeys.Count)
-                        : string.Format(LanguageManager.GetString("Msg.ExportAllKeysSuccessFormat", "Successfully exported all {0} key names to plain text."), keysToExport.Count);
+                    string msg = selectedKeys != null
+                        ? LanguageManager.GetStringFormat("Msg.ExportSelectedKeysSuccessFormat", "Successfully exported {0} selected key names to plain text.", selectedKeys.Count)
+                        : LanguageManager.GetStringFormat("Msg.ExportAllKeysSuccessFormat", "Successfully exported all {0} key names to plain text.", keysToExport.Count);
                     MessageBox.Show(
                         msg,
                         LanguageManager.GetString("Title.ExportKeyStructureSuccess", "Export Key Structure Success"),
@@ -7456,35 +7579,24 @@ namespace CsfStudio.UI
 
         private void menuScanIni_Click(object sender, EventArgs e)
         {
-            using (var dlg = new OpenFileDialog())
+            using (var scanDlg = new IniScanResultDialog(_session))
             {
-                dlg.Filter = LanguageManager.GetString("Filter.IniMapFilter", "C&C INI & Map Files (*.ini;*.map)|*.ini;*.map|C&C INI Files (*.ini)|*.ini|C&C Map Files (*.map)|*.map|All Files (*.*)|*.*");
-                dlg.Title = LanguageManager.GetString("MainForm.ScanIniTitle", "Select Mod INI or Map Files (rulesmd.ini, artmd.ini, mission.map, etc.)");
-                dlg.Multiselect = true;
-                InitFileDialogDirectory(dlg);
-
-                if (dlg.ShowDialog() == DialogResult.OK && dlg.FileNames.Length > 0)
+                var dlgRes = scanDlg.ShowDialog(this);
+                if (dlgRes == DialogResult.OK || scanDlg.AnyKeysAdded)
                 {
-                    SaveLastOpenDirectory(dlg.FileNames[0]);
-                    var filesMap = new Dictionary<string, List<IniScanResult>>(StringComparer.OrdinalIgnoreCase);
-                    foreach (var file in dlg.FileNames)
+                    if (scanDlg.NewlyAddedKeys != null && scanDlg.NewlyAddedKeys.Count > 0)
                     {
-                        var results = IniScanner.ScanIniFile(file, _session);
-                        filesMap[file] = results;
-                    }
-
-                    using (var scanDlg = new IniScanResultDialog(filesMap, _session))
-                    {
-                        var dlgRes = scanDlg.ShowDialog();
-                        if (dlgRes == DialogResult.OK || scanDlg.AnyKeysAdded)
+                        foreach (var key in scanDlg.NewlyAddedKeys)
                         {
-                            UpdateUIForSessionMode();
-                            RebuildCategoryTreeAndGrid();
-                            PopulateMasterGrid();
-                            UpdateFormTitle();
-                            ShowSaveNotification(LanguageManager.GetString("Toast.AddedMissingKeysFromIniScan", "⚡ Added missing keys from INI scan to session"));
+                            MarkKeyAsCreated(key);
                         }
                     }
+
+                    UpdateUIForSessionMode();
+                    RebuildCategoryTreeAndGrid();
+                    PopulateMasterGrid();
+                    UpdateFormTitle();
+                    ShowSaveNotification(LanguageManager.GetString("Toast.AddedMissingKeysFromIniScan", "⚡ Added missing keys from INI scan to session"));
                 }
             }
         }
@@ -8847,7 +8959,7 @@ namespace CsfStudio.UI
                         }
 
                         string rawItem = combo.Items[e.Index]?.ToString() ?? "";
-                        string cleanName = rawItem.Replace("🎯", "").Replace("🔴", "").Replace("🟡", "").Replace("🟢", "").Trim();
+                        string cleanName = rawItem.Replace("🎯", "").Replace("🔴", "").Replace("🟡", "").Replace("🟢", "").Replace("🔵", "").Trim();
 
                         Rectangle sphereRect = new Rectangle(e.Bounds.X + 4, e.Bounds.Y + (e.Bounds.Height - 12) / 2, 12, 12);
                         DrawStatusSphere(e.Graphics, sphereRect, rawItem);
@@ -9571,6 +9683,7 @@ namespace CsfStudio.UI
                     cboStatusFilter.Items.Add(LanguageManager.GetString("StatusFilter.Missing", "🔴 Missing Keys Only"));
                     cboStatusFilter.Items.Add(LanguageManager.GetString("StatusFilter.Empty", "🟡 Empty Strings Only"));
                     cboStatusFilter.Items.Add(LanguageManager.GetString("StatusFilter.Complete", "🟢 Complete Keys Only"));
+                    cboStatusFilter.Items.Add(LanguageManager.GetString("StatusFilter.Modified", "🔵 Modified Keys Only"));
                     if (selIdx >= 0 && selIdx < cboStatusFilter.Items.Count) cboStatusFilter.SelectedIndex = selIdx;
                     else if (cboStatusFilter.Items.Count > 0) cboStatusFilter.SelectedIndex = 0;
                 }
@@ -10045,6 +10158,7 @@ namespace CsfStudio.UI
         private ToolStripMenuItem _menuGridDuplicateKey;
         private ToolStripMenuItem _menuGridDeleteKey;
         private ToolStripMenuItem _menuTranslateGridSelection;
+        private ToolStripMenuItem _menuTranslateAllOpenDocs;
         private ToolStripMenuItem _menuExportSelectedKeys;
         private ToolStripMenuItem _menuCopyFrom;
         private ToolStripMenuItem _menuTranslateMain;
@@ -10108,9 +10222,10 @@ namespace CsfStudio.UI
             _menuGridAddKey = new ToolStripMenuItem(LanguageManager.GetString("Toolbar.AddKey", "➕ Add Key"), null, (s, e) => menuAddLabel_Click(s, e));
             _menuGridDuplicateKey = new ToolStripMenuItem(LanguageManager.GetString("Toolbar.DuplicateKey", "📋 Duplicate Key"), null, (s, e) => menuDuplicateKey_Click(s, e));
             _menuGridDeleteKey = new ToolStripMenuItem(LanguageManager.GetString("Toolbar.DeleteKey", "❌ Delete Key"), null, (s, e) => menuDeleteLabel_Click(s, e));
-            _menuTranslateGridSelection = new ToolStripMenuItem(LanguageManager.GetString("Menu.TranslateSelection", "🌐 Translate Selection..."));
             _menuExportSelectedKeys = new ToolStripMenuItem(LanguageManager.GetString("Menu.ExportSelectedKeys", "📤 Export Selected Keys to TXT"));
             _menuCopyFrom = new ToolStripMenuItem(LanguageManager.GetString("Menu.CopyFrom", "📋 Copy from..."));
+            _menuTranslateAllOpenDocs = new ToolStripMenuItem(LanguageManager.GetString("Menu.TranslateIntoAllOpenDocs", "🌐 Translate into ALL other open CSF files..."));
+            _menuTranslateGridSelection = new ToolStripMenuItem(LanguageManager.GetString("Menu.TranslateSelection", "🌐 Translate Selection..."));
 
             _gridContextMenu.Items.Add(_menuGridAddKey);
             _gridContextMenu.Items.Add(_menuGridDuplicateKey);
@@ -10119,12 +10234,14 @@ namespace CsfStudio.UI
             _gridContextMenu.Items.Add(_menuExportSelectedKeys);
             _gridContextMenu.Items.Add(_menuCopyFrom);
             _gridContextMenu.Items.Add(new ToolStripSeparator());
+            _gridContextMenu.Items.Add(_menuTranslateAllOpenDocs);
             _gridContextMenu.Items.Add(_menuTranslateGridSelection);
 
             gridLabels.ContextMenuStrip = _gridContextMenu;
             if (gridCoverage != null) gridCoverage.ContextMenuStrip = _gridContextMenu;
             if (gridUnsaved != null) gridUnsaved.ContextMenuStrip = _gridContextMenu;
             if (gridRecent != null) gridRecent.ContextMenuStrip = _gridContextMenu;
+            if (lstKeyEditorKeys != null) lstKeyEditorKeys.ContextMenuStrip = _gridContextMenu;
 
             _gridContextMenu.Opening += (s, e) =>
             {
@@ -10133,7 +10250,20 @@ namespace CsfStudio.UI
                     ? new List<string>(selKeys)
                     : new List<string>();
                 bool hasSel = selKeys != null && selKeys.Count > 0;
+                bool canTranslateAll = hasSel && _session != null && _session.Documents != null && _session.Documents.Count > 1;
+
+                _menuTranslateAllOpenDocs.Enabled = canTranslateAll;
+                if (canTranslateAll)
+                {
+                    PopulateTranslateAllOpenDocsMenu(_menuTranslateAllOpenDocs, _gridContextMenuSelectedKeys);
+                }
+                else
+                {
+                    _menuTranslateAllOpenDocs.DropDownItems.Clear();
+                }
+
                 _menuTranslateGridSelection.Enabled = hasSel;
+                PopulateTranslateGridSelectionMenu(_menuTranslateGridSelection, _gridContextMenuSelectedKeys);
 
                 _menuExportSelectedKeys.DropDownItems.Clear();
                 _menuExportSelectedKeys.Enabled = hasSel && _session != null && _session.Documents.Count > 0;
@@ -10302,27 +10432,7 @@ namespace CsfStudio.UI
                 });
                 _menuTranslateMain.DropDownItems.Add(itemMain);
 
-                if (_menuTranslateGridSelection != null)
-                {
-                    var itemGrid = new ToolStripMenuItem($"{iconStr}{sConfig.DisplayName}", null, (s, e) =>
-                    {
-                        var selKeys = _gridContextMenuSelectedKeys != null && _gridContextMenuSelectedKeys.Count > 0
-                            ? new List<string>(_gridContextMenuSelectedKeys)
-                            : GetCurrentlySelectedKeyNames();
-                        var readyConfig = EnsureTranslationServiceConfigured(sConfig);
-                        if (readyConfig == null) return;
-                        var dlg = new CsfStudio.UI.TranslationServiceForm(_session, readyConfig, selKeys);
-                        dlg.ShowDialog(this);
-                        if (dlg.TranslationUndoBatch != null && dlg.TranslationUndoBatch.Commands.Count > 0)
-                        {
-                            _undoManager.Execute(dlg.TranslationUndoBatch, _session);
-                            UpdateUndoRedoMenuItems();
-                        }
-                        InvalidateMasterRowsCache();
-                        RefreshDataAfterTextTranslation(selKeys);
-                    });
-                    _menuTranslateGridSelection.DropDownItems.Add(itemGrid);
-                }
+                // (Grid selection submenu populated dynamically in PopulateTranslateGridSelectionMenu)
             }
 
             _menuTranslateMain.DropDownItems.Add(new ToolStripSeparator());
@@ -10338,16 +10448,7 @@ namespace CsfStudio.UI
 
             if (_menuTranslateGridSelection != null)
             {
-                _menuTranslateGridSelection.DropDownItems.Add(new ToolStripSeparator());
-                var menuGridSettings = new ToolStripMenuItem(LanguageManager.GetString("Menu.Tools.TranslationSettings", "⚙️ Translation & AI Settings..."), null, (s, e) =>
-                {
-                    var dlg = new CsfStudio.UI.TranslationSettingsForm();
-                    if (dlg.ShowDialog(this) == DialogResult.OK)
-                    {
-                        BuildTranslationSubmenus();
-                    }
-                });
-                _menuTranslateGridSelection.DropDownItems.Add(menuGridSettings);
+                PopulateTranslateGridSelectionMenu(_menuTranslateGridSelection, _gridContextMenuSelectedKeys);
             }
         }
 
@@ -10495,6 +10596,15 @@ namespace CsfStudio.UI
             // 2. Physical Binary Header Language ID fallback (offset 0x14)
             string headerLanguage = TranslationLanguageHelper.GetIsoCode(doc.Document?.Language);
             if (!string.IsNullOrEmpty(headerLanguage)) return headerLanguage;
+
+            // 3. Fallback: normalize document LanguageTag (e.g. "ES", "DE", "FR", "RU", "ZH-HANS", "ZH-HANT") if it matches a known language
+            string tagLanguage = TranslationLanguageHelper.Normalize(doc.LanguageTag);
+            if (!string.IsNullOrEmpty(tagLanguage) && tagLanguage != "auto")
+            {
+                doc.TranslationContentLanguage = tagLanguage;
+                return tagLanguage;
+            }
+
             if (!promptForNeutral) return string.Empty;
 
             using (var dlg = new NeutralLanguageDialog(doc.FileName, contentLanguage))
@@ -11055,7 +11165,7 @@ namespace CsfStudio.UI
                 {
                     var doc = targetDocs[i];
                     string targetIso = GetTranslationLanguageForDocument(doc, true);
-                    if (string.IsNullOrEmpty(targetIso) || string.Equals(targetIso, sourceLanguage, StringComparison.OrdinalIgnoreCase))
+                    if (string.IsNullOrEmpty(targetIso))
                     {
                         continue;
                     }
@@ -11066,7 +11176,11 @@ namespace CsfStudio.UI
 
                     string translatedText = null;
 
-                    if (translatedByLanguage.TryGetValue(targetIso, out var cached))
+                    if (string.Equals(targetIso, sourceLanguage, StringComparison.OrdinalIgnoreCase))
+                    {
+                        translatedText = sourceText;
+                    }
+                    else if (translatedByLanguage.TryGetValue(targetIso, out var cached))
                     {
                         translatedText = cached;
                     }
@@ -11171,6 +11285,842 @@ namespace CsfStudio.UI
                 string failMsg = string.Format(
                     LanguageManager.GetString("Toast.TranslatedMultiFail", "⚠️ Failed to translate '{0}' into other open CSF files."),
                     keyName);
+                lblStatusCount.Text = failMsg;
+                ShowSaveNotification(failMsg);
+            }
+        }
+
+        private void PopulateTranslateAllOpenDocsMenu(ToolStripMenuItem menu, List<string> selectedKeys)
+        {
+            if (menu == null) return;
+            menu.DropDownItems.Clear();
+
+            if (_session == null || _session.Documents == null || _session.Documents.Count <= 1 || selectedKeys == null || selectedKeys.Count == 0)
+            {
+                menu.Enabled = false;
+                return;
+            }
+
+            menu.Enabled = true;
+
+            var configuredServices = CsfStudio.Core.Translation.TranslationConfigManager.ConfiguredServices?.Where(s => s.IsEnabled).ToList();
+            if (configuredServices == null || configuredServices.Count == 0)
+            {
+                var itemConfig = new ToolStripMenuItem(LanguageManager.GetString("Menu.Tools.ConfigureTranslationService", "⚙️ Configure Translation Services..."), null, (s, e) =>
+                {
+                    var dlg = new CsfStudio.UI.TranslationSettingsForm();
+                    if (dlg.ShowDialog(this) == DialogResult.OK)
+                    {
+                        BuildTranslationSubmenus();
+                    }
+                });
+                menu.DropDownItems.Add(itemConfig);
+                return;
+            }
+
+            var baseDoc = _session.BaseDocument ?? _session.Documents[0];
+
+            if (_session.Documents.Count == 2)
+            {
+                var targetDoc = _session.Documents.FirstOrDefault(d => !ReferenceEquals(d, baseDoc)) ?? _session.Documents[1];
+
+                foreach (var serviceConfig in configuredServices)
+                {
+                    var sConfig = serviceConfig;
+                    string iconStr = (sConfig.IsAiModel && !sConfig.DisplayName.StartsWith("[AI]", StringComparison.OrdinalIgnoreCase))
+                        ? "[AI] "
+                        : ((!sConfig.DisplayName.StartsWith("🌐") && !sConfig.DisplayName.StartsWith("[AI]")) ? "🌐 " : "");
+
+                    string itemText = string.Format(
+                        LanguageManager.GetString("Menu.TranslateIntoTargetDocWithServiceFormat", "{0}Translate into [{1}] with {2}"),
+                        iconStr, targetDoc.LanguageTag, sConfig.DisplayName);
+
+                    var item = new ToolStripMenuItem(itemText, null, (s, e) =>
+                    {
+                        ExecuteTranslateBatchIntoAllOtherDocs(sConfig, new List<string>(selectedKeys), baseDoc);
+                    });
+                    menu.DropDownItems.Add(item);
+                }
+
+                menu.DropDownItems.Add(new ToolStripSeparator());
+                var subReverse = new ToolStripMenuItem(string.Format(
+                    LanguageManager.GetString("Menu.TranslateFromDocFormat", "From [{0}] {1}"),
+                    targetDoc.LanguageTag, targetDoc.FileName));
+
+                foreach (var serviceConfig in configuredServices)
+                {
+                    var sConfig = serviceConfig;
+                    string iconStr = (sConfig.IsAiModel && !sConfig.DisplayName.StartsWith("[AI]", StringComparison.OrdinalIgnoreCase))
+                        ? "[AI] "
+                        : ((!sConfig.DisplayName.StartsWith("🌐") && !sConfig.DisplayName.StartsWith("[AI]")) ? "🌐 " : "");
+
+                    string revText = string.Format(LanguageManager.GetString("Menu.TranslateAllWithServiceFormat", "{0}... with {1}"), iconStr, sConfig.DisplayName);
+                    subReverse.DropDownItems.Add(new ToolStripMenuItem(revText, null, (s, e) =>
+                    {
+                        ExecuteTranslateBatchIntoAllOtherDocs(sConfig, new List<string>(selectedKeys), targetDoc);
+                    }));
+                }
+                menu.DropDownItems.Add(subReverse);
+            }
+            else
+            {
+                foreach (var serviceConfig in configuredServices)
+                {
+                    var sConfig = serviceConfig;
+                    string iconStr = (sConfig.IsAiModel && !sConfig.DisplayName.StartsWith("[AI]", StringComparison.OrdinalIgnoreCase))
+                        ? "[AI] "
+                        : ((!sConfig.DisplayName.StartsWith("🌐") && !sConfig.DisplayName.StartsWith("[AI]")) ? "🌐 " : "");
+
+                    string itemText = string.Format(
+                        LanguageManager.GetString("Menu.TranslateFromBaseToAllFormat", "{0}Translate into ALL ({1} files) with {2}"),
+                        iconStr, _session.Documents.Count - 1, sConfig.DisplayName);
+
+                    var item = new ToolStripMenuItem(itemText, null, (s, e) =>
+                    {
+                        ExecuteTranslateBatchIntoAllOtherDocs(sConfig, new List<string>(selectedKeys), baseDoc);
+                    });
+                    menu.DropDownItems.Add(item);
+                }
+
+                menu.DropDownItems.Add(new ToolStripSeparator());
+                var subFromRoot = new ToolStripMenuItem(LanguageManager.GetString("Menu.TranslateFromSpecificDoc", "Translate from specific CSF document..."));
+
+                foreach (var sDoc in _session.Documents)
+                {
+                    var doc = sDoc;
+                    string docTitle = ReferenceEquals(doc, baseDoc)
+                        ? string.Format(LanguageManager.GetString("Menu.TranslateFromBaseDocFormat", "From Base [{0}] {1}"), doc.LanguageTag, doc.FileName)
+                        : string.Format(LanguageManager.GetString("Menu.TranslateFromDocFormat", "From [{0}] {1}"), doc.LanguageTag, doc.FileName);
+
+                    var subDoc = new ToolStripMenuItem(docTitle);
+                    foreach (var serviceConfig in configuredServices)
+                    {
+                        var sConfig = serviceConfig;
+                        string iconStr = (sConfig.IsAiModel && !sConfig.DisplayName.StartsWith("[AI]", StringComparison.OrdinalIgnoreCase))
+                            ? "[AI] "
+                            : ((!sConfig.DisplayName.StartsWith("🌐") && !sConfig.DisplayName.StartsWith("[AI]")) ? "🌐 " : "");
+
+                        string subText = string.Format(LanguageManager.GetString("Menu.TranslateAllWithServiceFormat", "{0}... with {1}"), iconStr, sConfig.DisplayName);
+                        subDoc.DropDownItems.Add(new ToolStripMenuItem(subText, null, (s, e) =>
+                        {
+                            ExecuteTranslateBatchIntoAllOtherDocs(sConfig, new List<string>(selectedKeys), doc);
+                        }));
+                    }
+                    subFromRoot.DropDownItems.Add(subDoc);
+                }
+                menu.DropDownItems.Add(subFromRoot);
+            }
+        }
+
+        private void PopulateTranslateGridSelectionMenu(ToolStripMenuItem menu, List<string> selectedKeys)
+        {
+            if (menu == null) return;
+            menu.DropDownItems.Clear();
+
+            bool hasMultiDocs = _session != null && _session.Documents != null && _session.Documents.Count > 1;
+            var configuredServices = CsfStudio.Core.Translation.TranslationConfigManager.ConfiguredServices?.Where(s => s.IsEnabled).ToList();
+
+            if (hasMultiDocs && selectedKeys != null && selectedKeys.Count > 0)
+            {
+                var itemAll = new ToolStripMenuItem(LanguageManager.GetString("Menu.TranslateIntoAllOpenDocs", "🌐 Translate into ALL other open CSF files..."));
+                PopulateTranslateAllOpenDocsMenu(itemAll, selectedKeys);
+                menu.DropDownItems.Add(itemAll);
+                menu.DropDownItems.Add(new ToolStripSeparator());
+            }
+
+            if (configuredServices != null && configuredServices.Count > 0)
+            {
+                var menuDialog = hasMultiDocs
+                    ? new ToolStripMenuItem(LanguageManager.GetString("Menu.ContextMenu.BatchTranslateDialog", "📂 Batch Translate CSF Files (Dialog)..."))
+                    : null;
+
+                foreach (var serviceConfig in configuredServices)
+                {
+                    var sConfig = serviceConfig;
+                    string iconStr = (sConfig.IsAiModel && !sConfig.DisplayName.StartsWith("[AI]", StringComparison.OrdinalIgnoreCase))
+                        ? "[AI] "
+                        : ((!sConfig.DisplayName.StartsWith("🌐") && !sConfig.DisplayName.StartsWith("[AI]")) ? "🌐 " : "");
+
+                    string itemText = $"{iconStr}{sConfig.DisplayName}";
+
+                    var itemGrid = new ToolStripMenuItem(itemText, null, (s, e) =>
+                    {
+                        var selKeys = selectedKeys != null && selectedKeys.Count > 0
+                            ? new List<string>(selectedKeys)
+                            : GetCurrentlySelectedKeyNames();
+                        var readyConfig = EnsureTranslationServiceConfigured(sConfig);
+                        if (readyConfig == null) return;
+                        var dlg = new CsfStudio.UI.TranslationServiceForm(_session, readyConfig, selKeys);
+                        dlg.ShowDialog(this);
+                        if (dlg.TranslationUndoBatch != null && dlg.TranslationUndoBatch.Commands.Count > 0)
+                        {
+                            _undoManager.Execute(dlg.TranslationUndoBatch, _session);
+                            UpdateUndoRedoMenuItems();
+                        }
+                        InvalidateMasterRowsCache();
+                        RefreshDataAfterTextTranslation(selKeys);
+                    });
+
+                    if (menuDialog != null)
+                    {
+                        menuDialog.DropDownItems.Add(itemGrid);
+                    }
+                    else
+                    {
+                        menu.DropDownItems.Add(itemGrid);
+                    }
+                }
+
+                if (menuDialog != null)
+                {
+                    menu.DropDownItems.Add(menuDialog);
+                }
+            }
+
+            menu.DropDownItems.Add(new ToolStripSeparator());
+            var menuGridSettings = new ToolStripMenuItem(LanguageManager.GetString("Menu.Tools.TranslationSettings", "⚙️ Translation & AI Settings..."), null, (s, e) =>
+            {
+                var dlg = new CsfStudio.UI.TranslationSettingsForm();
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    BuildTranslationSubmenus();
+                }
+            });
+            menu.DropDownItems.Add(menuGridSettings);
+        }
+
+        private void UpdateCoverageGridRowAfterValueChange(string keyName, CsfSessionDocument changedDoc)
+        {
+            if (gridCoverage == null || gridCoverage.Rows.Count == 0 || string.IsNullOrEmpty(keyName) || _session == null) return;
+
+            foreach (DataGridViewRow r in gridCoverage.Rows)
+            {
+                if (!(r.Tag is MasterKeyRow row) || !string.Equals(row.KeyName, keyName, StringComparison.OrdinalIgnoreCase)) continue;
+
+                int presentInFiles = 0;
+                var fileBadges = new List<string>();
+                foreach (var doc in _session.Documents)
+                {
+                    bool exists = row.ValuesPerLanguage.TryGetValue(doc.LanguageTag, out var entry);
+                    bool hasText = exists && !string.IsNullOrEmpty(entry?.Value);
+                    bool isLangModified = _modifiedKeyMap != null && _modifiedKeyMap.Contains($"{doc.LanguageTag}:{row.KeyName}");
+
+                    if (hasText)
+                    {
+                        presentInFiles++;
+                        if (isLangModified)
+                        {
+                            fileBadges.Add(string.Format(LanguageManager.GetString("Coverage.BadgeModifiedFormat", "✏️ {0} (modified)"), doc.LanguageTag));
+                        }
+                        else
+                        {
+                            fileBadges.Add(doc.LanguageTag);
+                        }
+                    }
+                    else if (exists)
+                    {
+                        if (isLangModified)
+                        {
+                            fileBadges.Add(string.Format(LanguageManager.GetString("Coverage.BadgeEmptyModifiedFormat", "✏️ {0} (empty, modified)"), doc.LanguageTag));
+                        }
+                        else
+                        {
+                            fileBadges.Add(string.Format(LanguageManager.GetString("Coverage.BadgeEmptyFormat", "{0} (empty)"), doc.LanguageTag));
+                        }
+                    }
+                }
+
+                double rowPct = (presentInFiles * 100.0) / Math.Max(1, _session.Documents.Count);
+                string statusStr = string.Join("  |  ", fileBadges);
+                string pctStr = string.Format(LanguageManager.GetString("Coverage.FilesCountFormat", "{0:F0}% ({1}/{2} files)"), rowPct, presentInFiles, _session.Documents.Count);
+
+                if (r.Cells.Count > 1) r.Cells[1].Value = statusStr;
+                if (r.Cells.Count > 2) r.Cells[2].Value = pctStr;
+
+                try { gridCoverage.InvalidateRow(r.Index); } catch { }
+                break;
+            }
+        }
+
+        private void FastUpdateCoverageGridRowAfterValueChange(string keyName, CsfSessionDocument changedDoc, Dictionary<string, DataGridViewRow> coverageRowMap)
+        {
+            if (coverageRowMap == null || !coverageRowMap.TryGetValue(keyName, out var r) || r == null || r.DataGridView == null) return;
+            if (!(r.Tag is MasterKeyRow row)) return;
+
+            int presentInFiles = 0;
+            var fileBadges = new List<string>();
+            foreach (var doc in _session.Documents)
+            {
+                bool exists = row.ValuesPerLanguage.TryGetValue(doc.LanguageTag, out var entry);
+                bool hasText = exists && !string.IsNullOrEmpty(entry?.Value);
+                bool isLangModified = _modifiedKeyMap != null && _modifiedKeyMap.Contains($"{doc.LanguageTag}:{row.KeyName}");
+
+                if (hasText)
+                {
+                    presentInFiles++;
+                    if (isLangModified)
+                    {
+                        fileBadges.Add(string.Format(LanguageManager.GetString("Coverage.BadgeModifiedFormat", "✏️ {0} (modified)"), doc.LanguageTag));
+                    }
+                    else
+                    {
+                        fileBadges.Add(doc.LanguageTag);
+                    }
+                }
+                else if (exists)
+                {
+                    if (isLangModified)
+                    {
+                        fileBadges.Add(string.Format(LanguageManager.GetString("Coverage.BadgeEmptyModifiedFormat", "✏️ {0} (empty, modified)"), doc.LanguageTag));
+                    }
+                    else
+                    {
+                        fileBadges.Add(string.Format(LanguageManager.GetString("Coverage.BadgeEmptyFormat", "{0} (empty)"), doc.LanguageTag));
+                    }
+                }
+            }
+
+            double rowPct = (presentInFiles * 100.0) / Math.Max(1, _session.Documents.Count);
+            string statusStr = string.Join("  |  ", fileBadges);
+            string pctStr = string.Format(LanguageManager.GetString("Coverage.FilesCountFormat", "{0:F0}% ({1}/{2} files)"), rowPct, presentInFiles, _session.Documents.Count);
+
+            if (r.Cells.Count > 1) r.Cells[1].Value = statusStr;
+            if (r.Cells.Count > 2) r.Cells[2].Value = pctStr;
+
+            try { r.DataGridView.InvalidateRow(r.Index); } catch { }
+        }
+
+        private void FastUpdateGridRowAfterValueChange(string keyName, CsfSessionDocument changedDoc, Dictionary<string, DataGridViewRow> masterRowGridMap)
+        {
+            if (masterRowGridMap == null || !masterRowGridMap.TryGetValue(keyName, out var r) || r == null || r.DataGridView == null) return;
+            if (!(r.Tag is MasterKeyRow row)) return;
+
+            bool showIndexCol = gridLabels.Columns.Count > 0 && gridLabels.Columns[0].HeaderText == "#";
+            int statusColIdx = showIndexCol ? 1 : 0;
+            int firstValueColIdx = showIndexCol ? 3 : 2;
+
+            bool isSingleDocFocused = !_session.IsSingleFileMode && (cboFileFilter?.SelectedItem is DocumentFilterOption opt && opt.Document != null);
+            CsfSessionDocument displayedDoc = isSingleDocFocused ? ((DocumentFilterOption)cboFileFilter.SelectedItem).Document : _session.BaseDocument;
+            bool affectsDisplayedDoc = ReferenceEquals(displayedDoc, changedDoc) ||
+                string.Equals(displayedDoc?.LanguageTag, changedDoc.LanguageTag, StringComparison.OrdinalIgnoreCase);
+
+            string statusIcon = "🟢";
+            if (row.Status == KeySyncStatus.MissingInSome) statusIcon = "🔴";
+            else if (row.Status == KeySyncStatus.UntranslatedOrEmpty) statusIcon = "🟡";
+            if (r.Cells.Count > statusColIdx) r.Cells[statusColIdx].Value = statusIcon;
+
+            if (_session.IsSingleFileMode || isSingleDocFocused)
+            {
+                if (affectsDisplayedDoc)
+                {
+                    bool exists = row.ValuesPerLanguage.TryGetValue(changedDoc.LanguageTag, out var entry) && entry != null;
+                    string val = exists ? (entry.Value ?? string.Empty) : LanguageManager.GetString("Grid.Status.MissingEntry", "[Missing Entry]");
+                    for (int c = firstValueColIdx; c < gridLabels.Columns.Count; c++)
+                    {
+                        if (gridLabels.Columns[c].HeaderText == "String Value" || gridLabels.Columns[c].HeaderText == LanguageManager.GetString("Grid.Column.Value", "String Value"))
+                        {
+                            r.Cells[c].Value = val;
+                            break;
+                        }
+                    }
+                    if (exists && !string.IsNullOrEmpty(entry.Value) &&
+                        r.DefaultCellStyle.BackColor == Color.FromArgb(255, 235, 235))
+                    {
+                        r.DefaultCellStyle = null;
+                    }
+                }
+            }
+            else
+            {
+                for (int c = 0; c < _session.Documents.Count; c++)
+                {
+                    if (!ReferenceEquals(_session.Documents[c], changedDoc)) continue;
+                    int colIdx = firstValueColIdx + c;
+                    if (colIdx < r.Cells.Count)
+                    {
+                        var docLbl = changedDoc.Document?.Labels?.FirstOrDefault(l => string.Equals(l.Name, keyName, StringComparison.OrdinalIgnoreCase));
+                        string cellVal = (docLbl != null && docLbl.Strings.Count > 0)
+                            ? (docLbl.Strings[0].Value ?? string.Empty)
+                            : LanguageManager.GetString("Grid.Status.MissingEntry", "[Missing Entry]");
+                        r.Cells[colIdx].Value = cellVal;
+                    }
+                    break;
+                }
+            }
+
+            try { r.DataGridView.InvalidateRow(r.Index); } catch { }
+        }
+
+        private async void ExecuteTranslateBatchIntoAllOtherDocs(CsfStudio.Core.Translation.TranslationServiceConfig sConfig, List<string> keysToTranslate, CsfSessionDocument sourceDoc)
+        {
+            if (sConfig == null || _session == null) return;
+
+            if (_isBatchTranslating)
+            {
+                ShowSaveNotification(LanguageManager.GetString("Toast.TranslationAlreadyInProgress", "⚠️ A batch translation is already in progress."));
+                return;
+            }
+
+            sConfig = EnsureTranslationServiceConfigured(sConfig);
+            if (sConfig == null) return;
+
+            if (_session.Documents == null || _session.Documents.Count <= 1)
+            {
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.NoOtherOpenDocs", "There are no other open CSF files in this session to translate into."),
+                    LanguageManager.GetString("Title.InstantTranslation", "Instant Translation"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            if (keysToTranslate == null || keysToTranslate.Count == 0) return;
+
+            var uniqueKeys = keysToTranslate
+                .Where(k => !string.IsNullOrWhiteSpace(k))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (uniqueKeys.Count == 0) return;
+
+            if (sourceDoc == null)
+            {
+                sourceDoc = _session.BaseDocument ?? _session.Documents[0];
+            }
+
+            var targetDocs = _session.Documents.Where(d => !ReferenceEquals(d, sourceDoc)).ToList();
+            if (targetDocs.Count == 0) return;
+
+            // 1. Resolve source text and source document for each key
+            var keySourceTexts = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var keySourceDocs = new Dictionary<string, CsfSessionDocument>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string key in uniqueKeys)
+            {
+                string srcText = null;
+                CsfSessionDocument foundDoc = null;
+
+                if (sourceDoc.Document != null)
+                {
+                    var lbl = sourceDoc.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, key, StringComparison.OrdinalIgnoreCase));
+                    if (lbl != null && lbl.Strings.Count > 0 && !string.IsNullOrWhiteSpace(lbl.Strings[0].Value))
+                    {
+                        srcText = lbl.Strings[0].Value;
+                        foundDoc = sourceDoc;
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(srcText) && _session.BaseDocument != null && !ReferenceEquals(_session.BaseDocument, sourceDoc) && _session.BaseDocument.Document != null)
+                {
+                    var lbl = _session.BaseDocument.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, key, StringComparison.OrdinalIgnoreCase));
+                    if (lbl != null && lbl.Strings.Count > 0 && !string.IsNullOrWhiteSpace(lbl.Strings[0].Value))
+                    {
+                        srcText = lbl.Strings[0].Value;
+                        foundDoc = _session.BaseDocument;
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(srcText))
+                {
+                    foreach (var doc in _session.Documents)
+                    {
+                        if (ReferenceEquals(doc, sourceDoc) || ReferenceEquals(doc, _session.BaseDocument) || doc.Document == null) continue;
+                        var lbl = doc.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, key, StringComparison.OrdinalIgnoreCase));
+                        if (lbl != null && lbl.Strings.Count > 0 && !string.IsNullOrWhiteSpace(lbl.Strings[0].Value))
+                        {
+                            srcText = lbl.Strings[0].Value;
+                            foundDoc = doc;
+                            break;
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(srcText))
+                {
+                    keySourceTexts[key] = srcText;
+                    keySourceDocs[key] = foundDoc ?? sourceDoc;
+                }
+            }
+
+            if (keySourceTexts.Count == 0)
+            {
+                MessageBox.Show(
+                    LanguageManager.GetString("Msg.NoReferenceTextAvailable", "There is no reference text available in other open CSF files to translate this entry."),
+                    LanguageManager.GetString("Title.InstantTranslation", "Instant Translation"),
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            // 2. Prompt confirmation when translating multiple keys
+            if (keySourceTexts.Count > 1)
+            {
+                string targetDocsSummary = string.Join(", ", targetDocs.Select(d => $"[{d.LanguageTag}] {d.FileName}"));
+                string confirmMsg = string.Format(
+                    LanguageManager.GetString("Msg.ConfirmTranslateBatchAllDocsFormat",
+                        "Translate {0} selected key(s) into {1} open CSF document(s) via '{2}'?\n\n· Source CSF: [{3}] {4}\n· Target CSFs: {5}"),
+                    keySourceTexts.Count,
+                    targetDocs.Count,
+                    sConfig.DisplayName,
+                    sourceDoc.LanguageTag,
+                    sourceDoc.FileName,
+                    targetDocsSummary);
+
+                if (MessageBox.Show(
+                    confirmMsg,
+                    LanguageManager.GetString("Title.ConfirmTranslation", "Confirm Translation"),
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question) != DialogResult.Yes)
+                {
+                    return;
+                }
+            }
+
+            // 3. Resolve default source language
+            string defaultSourceLang = GetTranslationLanguageForDocument(sourceDoc, true);
+            if (string.IsNullOrEmpty(defaultSourceLang))
+            {
+                defaultSourceLang = _session.BaseDocument != null ? GetTranslationLanguageForDocument(_session.BaseDocument, true) : "auto";
+            }
+            if (string.IsNullOrEmpty(defaultSourceLang)) defaultSourceLang = "auto";
+
+            var provider = CsfStudio.Core.Translation.TranslationProviderFactory.CreateProvider(sConfig);
+            var batchCmd = new BatchUndoCommand(string.Format(
+                LanguageManager.GetString("Undo.TranslateBatchAllDocsFormat", "Translate {0} key(s) into all open CSF files via {1}"),
+                keySourceTexts.Count, sConfig.DisplayName));
+
+            int totalOperations = keySourceTexts.Count * targetDocs.Count;
+            int totalCompleted = 0;
+            int errorCount = 0;
+            var updatedKeysSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var appliedKeysPerDoc = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // Pre-index rows for O(1) instantaneous lookup
+            var coverageRowMap = new Dictionary<string, DataGridViewRow>(StringComparer.OrdinalIgnoreCase);
+            if (gridCoverage != null && gridCoverage.Rows.Count > 0)
+            {
+                foreach (DataGridViewRow r in gridCoverage.Rows)
+                {
+                    if (r.Tag is MasterKeyRow mkr && !string.IsNullOrEmpty(mkr.KeyName))
+                        coverageRowMap[mkr.KeyName] = r;
+                }
+            }
+
+            var masterRowGridMap = new Dictionary<string, DataGridViewRow>(StringComparer.OrdinalIgnoreCase);
+            if (gridLabels != null && gridLabels.Rows.Count > 0)
+            {
+                foreach (DataGridViewRow r in gridLabels.Rows)
+                {
+                    if (r.Tag is MasterKeyRow mkr && !string.IsNullOrEmpty(mkr.KeyName))
+                        masterRowGridMap[mkr.KeyName] = r;
+                }
+            }
+
+            _batchTranslationCts = new CancellationTokenSource();
+            var cancellationToken = _batchTranslationCts.Token;
+            _isBatchTranslating = true;
+            bool prevSync = _isSyncingSelection;
+            _isSyncingSelection = true;
+
+            if (_statusProgressBar == null)
+            {
+                _statusProgressBar = new ToolStripProgressBar
+                {
+                    Name = "pbTranslationStatus",
+                    Size = new Size(130, 16),
+                    Style = ProgressBarStyle.Continuous,
+                    Visible = false
+                };
+                statusStrip1.Items.Insert(1, _statusProgressBar);
+            }
+
+            if (_btnStatusCancel == null)
+            {
+                _btnStatusCancel = new ToolStripButton(LanguageManager.GetString("Button.Cancel", "❌ Cancel"))
+                {
+                    DisplayStyle = ToolStripItemDisplayStyle.Text,
+                    Visible = false,
+                    ForeColor = Color.DarkRed,
+                    Font = new Font(statusStrip1.Font, FontStyle.Bold)
+                };
+                _btnStatusCancel.Click += (s, e) =>
+                {
+                    _batchTranslationCts?.Cancel();
+                    _btnStatusCancel.Enabled = false;
+                    lblStatusCount.Text = LanguageManager.GetString("MainForm.TranslationCancelling", "⏳ Cancelling translation...");
+                };
+                statusStrip1.Items.Insert(2, _btnStatusCancel);
+            }
+
+            _statusProgressBar.Minimum = 0;
+            _statusProgressBar.Maximum = Math.Max(1, totalOperations);
+            _statusProgressBar.Value = 0;
+            _statusProgressBar.Visible = true;
+            _btnStatusCancel.Enabled = true;
+            _btnStatusCancel.Visible = true;
+
+            void ApplyTranslation(CsfSessionDocument doc, string key, string text)
+            {
+                string trackKey = $"{doc.LanguageTag}:{key}";
+                if (!appliedKeysPerDoc.Add(trackKey)) return;
+
+                var lbl = doc.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, key, StringComparison.OrdinalIgnoreCase));
+                bool isNew = (lbl == null);
+
+                if (isNew)
+                {
+                    lbl = new CsfLabel(key);
+                    doc.Document.Labels.Add(lbl);
+                    batchCmd.AddCommand(new AddKeyCommand(key, doc.LanguageTag));
+                    MarkKeyAsCreated(key);
+                }
+
+                string oldVal = (lbl.Strings.Count > 0) ? (lbl.Strings[0].Value ?? string.Empty) : string.Empty;
+                string oldExtra = (lbl.Strings.Count > 0) ? lbl.Strings[0].ExtraValue : null;
+
+                if (lbl.Strings.Count == 0)
+                {
+                    lbl.Strings.Add(new CsfStringEntry(text, oldExtra));
+                }
+                else
+                {
+                    lbl.Strings[0].Value = text;
+                }
+
+                doc.IsModified = true;
+                MarkKeyAsModified(doc.LanguageTag, key);
+                batchCmd.AddCommand(new EditValueCommand(doc.LanguageTag, key, isNew ? string.Empty : oldVal, text, oldExtra, oldExtra));
+
+                if (GetMasterRowsMap().TryGetValue(key, out var masterRow) && masterRow != null)
+                {
+                    masterRow.ValuesPerLanguage[doc.LanguageTag] = lbl.Strings[0];
+                    masterRow.MissingLanguages.Remove(doc.LanguageTag);
+                }
+
+                FastUpdateGridRowAfterValueChange(key, doc, masterRowGridMap);
+                FastUpdateCoverageGridRowAfterValueChange(key, doc, coverageRowMap);
+
+                if (_langTextEditors.TryGetValue(doc.LanguageTag, out var txtEditor) && txtEditor != null && !txtEditor.IsDisposed)
+                {
+                    if (_lastActiveSelectedKeys != null && _lastActiveSelectedKeys.Contains(key, StringComparer.OrdinalIgnoreCase))
+                    {
+                        _isPopulatingInspector = true;
+                        try { txtEditor.Text = NormalizeToWinFormsLineBreaks(text); }
+                        finally { _isPopulatingInspector = false; }
+                    }
+                }
+
+                updatedKeysSet.Add(key);
+            }
+
+            int lastReportedCount = 0;
+            DateTime lastReportTime = DateTime.MinValue;
+
+            void ReportProgress(string currentKey, string currentDocTag)
+            {
+                totalCompleted++;
+                var now = DateTime.UtcNow;
+                if (totalCompleted == totalOperations || (now - lastReportTime).TotalMilliseconds >= 60 || totalCompleted - lastReportedCount >= 5)
+                {
+                    lastReportTime = now;
+                    lastReportedCount = totalCompleted;
+                    int pct = (int)((totalCompleted * 100.0) / Math.Max(1, totalOperations));
+                    if (_statusProgressBar != null && !_statusProgressBar.IsDisposed)
+                    {
+                        _statusProgressBar.Value = Math.Min(_statusProgressBar.Maximum, totalCompleted);
+                    }
+                    lblStatusCount.Text = string.Format(
+                        LanguageManager.GetString("MainForm.BatchTranslatingProgressSummaryFormat", "⏳ [{0}/{1}] ({2}%) Translating '{3}' into [{4}] via {5}..."),
+                        totalCompleted, totalOperations, pct, currentKey, currentDocTag, sConfig.DisplayName);
+                }
+            }
+
+            try
+            {
+                var translationsByLang = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+
+                for (int i = 0; i < targetDocs.Count; i++)
+                {
+                    if (cancellationToken.IsCancellationRequested) break;
+
+                    var tgtDoc = targetDocs[i];
+                    string targetIso = GetTranslationLanguageForDocument(tgtDoc, true);
+                    if (string.IsNullOrEmpty(targetIso)) continue;
+
+                    if (!translationsByLang.TryGetValue(targetIso, out var langTranslations))
+                    {
+                        langTranslations = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                        translationsByLang[targetIso] = langTranslations;
+
+                        var itemsToTranslate = new List<CsfStudio.Core.Translation.TranslationItem>();
+
+                        foreach (var kvp in keySourceTexts)
+                        {
+                            if (cancellationToken.IsCancellationRequested) break;
+                            string key = kvp.Key;
+                            string text = kvp.Value;
+                            string itemSrcLang = defaultSourceLang;
+                            if (keySourceDocs.TryGetValue(key, out var specificSrcDoc) && specificSrcDoc != null)
+                            {
+                                string specLang = GetTranslationLanguageForDocument(specificSrcDoc, false);
+                                if (!string.IsNullOrEmpty(specLang)) itemSrcLang = specLang;
+                            }
+
+                            if (string.Equals(targetIso, itemSrcLang, StringComparison.OrdinalIgnoreCase))
+                            {
+                                langTranslations[key] = text;
+                                ApplyTranslation(tgtDoc, key, text);
+                                ReportProgress(key, tgtDoc.LanguageTag);
+
+                                if (totalCompleted % 25 == 0)
+                                {
+                                    await Task.Yield();
+                                }
+                            }
+                            else
+                            {
+                                var itm = new CsfStudio.Core.Translation.TranslationItem
+                                {
+                                    Key = key,
+                                    SourceText = text
+                                };
+
+                                var docForCallback = tgtDoc;
+                                itm.OnCompleted = (completedItm) =>
+                                {
+                                    if (this.IsDisposed || cancellationToken.IsCancellationRequested) return;
+                                    this.BeginInvoke((Action)(() =>
+                                    {
+                                        if (this.IsDisposed) return;
+                                        ApplyTranslation(docForCallback, completedItm.Key, completedItm.TranslatedText);
+                                        ReportProgress(completedItm.Key, docForCallback.LanguageTag);
+                                    }));
+                                };
+
+                                itemsToTranslate.Add(itm);
+                            }
+                        }
+
+                        if (itemsToTranslate.Count > 0 && !cancellationToken.IsCancellationRequested)
+                        {
+                            try
+                            {
+                                var result = await Task.Run(() => CsfStudio.Core.Translation.TranslationBatcher.ExecuteBatchTranslationAsync(
+                                    provider,
+                                    itemsToTranslate,
+                                    defaultSourceLang,
+                                    targetIso,
+                                    (processed, total) =>
+                                    {
+                                        // Progress reported via item.OnCompleted & ReportProgress
+                                    },
+                                    cancellationToken), cancellationToken);
+
+                                if (result != null && result.Items != null)
+                                {
+                                    foreach (var itm in result.Items)
+                                    {
+                                        if (!string.IsNullOrEmpty(itm.TranslatedText))
+                                        {
+                                            langTranslations[itm.Key] = itm.TranslatedText;
+                                            ApplyTranslation(tgtDoc, itm.Key, itm.TranslatedText);
+                                        }
+                                        else if (!string.IsNullOrEmpty(itm.ErrorMessage))
+                                        {
+                                            errorCount++;
+                                        }
+                                    }
+                                }
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                break;
+                            }
+                            catch (Exception)
+                            {
+                                errorCount++;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // Use cached translations for another doc sharing this target language
+                        foreach (var kvp in langTranslations)
+                        {
+                            if (cancellationToken.IsCancellationRequested) break;
+                            ApplyTranslation(tgtDoc, kvp.Key, kvp.Value);
+                            ReportProgress(kvp.Key, tgtDoc.LanguageTag);
+
+                            if (totalCompleted % 25 == 0)
+                            {
+                                await Task.Yield();
+                            }
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                _isBatchTranslating = false;
+                _isSyncingSelection = prevSync;
+
+                if (_statusProgressBar != null && !_statusProgressBar.IsDisposed)
+                {
+                    _statusProgressBar.Visible = false;
+                }
+                if (_btnStatusCancel != null && !_btnStatusCancel.IsDisposed)
+                {
+                    _btnStatusCancel.Visible = false;
+                }
+
+                _batchTranslationCts?.Dispose();
+                _batchTranslationCts = null;
+            }
+
+            if (batchCmd.Commands.Count > 0)
+            {
+                _undoManager.Execute(batchCmd, _session);
+                UpdateUndoRedoMenuItems();
+            }
+
+            foreach (var k in updatedKeysSet)
+            {
+                AddRecentEditedKey(k);
+            }
+
+            _unsavedDirty = true;
+            _coverageDirty = true;
+            _recentDirty = true;
+
+            UpdateTabVisibilityState();
+            UpdateFormTitle();
+
+            // Refresh Coverage Matrix smoothly ONCE at the end
+            if (tabCoverage != null && tabControlMain?.SelectedTab == tabCoverage)
+            {
+                PopulateCoverageMatrixTab();
+                _coverageDirty = false;
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                string cancelMsg = string.Format(
+                    LanguageManager.GetString("Toast.TranslationCancelledFormat", "⏹️ Translation cancelled: {0} key(s) translated into open CSF files via {1}."),
+                    updatedKeysSet.Count, sConfig.DisplayName);
+                lblStatusCount.Text = cancelMsg;
+                ShowSaveNotification(cancelMsg);
+            }
+            else if (updatedKeysSet.Count > 0)
+            {
+                string successMsg = string.Format(
+                    LanguageManager.GetString("Toast.TranslatedBatchMultiSuccessFormat", "⚡ Translated {0} key(s) into {1} open CSF file(s) via {2}."),
+                    updatedKeysSet.Count, targetDocs.Count, sConfig.DisplayName);
+                lblStatusCount.Text = successMsg;
+                ShowSaveNotification(successMsg);
+            }
+            else
+            {
+                string failMsg = LanguageManager.GetString("Toast.TranslatedBatchMultiFail", "⚠️ Failed to translate selected keys into other open CSF files.");
                 lblStatusCount.Text = failMsg;
                 ShowSaveNotification(failMsg);
             }

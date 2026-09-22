@@ -63,6 +63,11 @@ namespace CsfStudio.Core.Translation
                         s.ProviderType = "MicrosoftTranslator";
                         dirty = true;
                     }
+                    if (s.SectionName.Equals("Google", StringComparison.OrdinalIgnoreCase) && s.UrlTemplate != null && s.UrlTemplate.Contains("client=gtx"))
+                    {
+                        s.UrlTemplate = s.UrlTemplate.Replace("client=gtx", "client=dict-chrome-ex");
+                        dirty = true;
+                    }
                     if (s.DisplayName.Contains("1.5 Flash") || s.DisplayName.Contains("GPT-4o-mini") || s.DisplayName.Contains("Llama 3.1") || s.DisplayName.Contains("Free Tier") || s.DisplayName.Contains("V4 Flash") || s.DisplayName.Contains("(Official API)") || s.DisplayName.Contains("(Free)"))
                     {
                         if (s.SectionName.Equals("Google", StringComparison.OrdinalIgnoreCase)) { s.DisplayName = "Google Translate"; dirty = true; }
@@ -371,7 +376,7 @@ namespace CsfStudio.Core.Translation
                 SectionName = "Google",
                 DisplayName = "Google Translate",
                 ProviderType = "GoogleWeb",
-                UrlTemplate = "https://translate.googleapis.com/translate_a/single?client=gtx&sl={src}&tl={tgt}&dt=t&q={text}",
+                UrlTemplate = "https://translate.googleapis.com/translate_a/single?client=dict-chrome-ex&sl={src}&tl={tgt}&dt=t&q={text}",
                 HttpMethod = "GET",
                 UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
                 IsEnabled = true

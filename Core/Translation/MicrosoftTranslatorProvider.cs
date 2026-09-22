@@ -113,6 +113,7 @@ namespace CsfStudio.Core.Translation
                             if (firstTranslation != null && firstTranslation.TryGetValue("text", out object translated))
                             {
                                 items[i].TranslatedText = translated?.ToString();
+                                try { items[i].OnCompleted?.Invoke(items[i]); } catch { }
                             }
                         }
                     }
