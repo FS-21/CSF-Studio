@@ -299,9 +299,10 @@ namespace CsfStudio.Core
             OldKeyName,
             NewKeyName);
         public string TargetLanguageTag { get; }
-        public string TargetKeyName => NewKeyName;
+        public string TargetKeyName => _isUndone ? OldKeyName : NewKeyName;
         public string OldKeyName { get; }
         public string NewKeyName { get; }
+        private bool _isUndone = false;
 
         public RenameKeyCommand(string oldKeyName, string newKeyName, string langTag = null)
         {
@@ -312,6 +313,7 @@ namespace CsfStudio.Core
 
         public void Undo(CsfSession session)
         {
+            _isUndone = true;
             foreach (var sDoc in session.Documents)
             {
                 if (sDoc.Document == null) continue;
@@ -326,6 +328,7 @@ namespace CsfStudio.Core
 
         public void Redo(CsfSession session)
         {
+            _isUndone = false;
             foreach (var sDoc in session.Documents)
             {
                 if (sDoc.Document == null) continue;

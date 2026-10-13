@@ -557,15 +557,48 @@ namespace CsfStudio.UI
                 }
             };
 
-            gridLabels.KeyDown += (s, e) =>
+            KeyEventHandler handleF2Rename = (s, e) =>
             {
-                if (e.KeyCode == Keys.F2 && gridLabels.SelectedRows.Count > 0)
+                if (e.KeyCode == Keys.F2)
                 {
-                    e.SuppressKeyPress = true;
-                    txtCurrentKeyName.Focus();
-                    txtCurrentKeyName.SelectAll();
+                    var sel = GetCurrentlySelectedKeyNames();
+                    if (sel != null && sel.Count > 0)
+                    {
+                        e.SuppressKeyPress = true;
+                        txtCurrentKeyName.Focus();
+                        txtCurrentKeyName.SelectAll();
+                    }
                 }
             };
+            gridLabels.KeyDown += handleF2Rename;
+            if (gridUnsaved != null) gridUnsaved.KeyDown += handleF2Rename;
+            if (gridRecent != null) gridRecent.KeyDown += handleF2Rename;
+            if (gridCoverage != null) gridCoverage.KeyDown += handleF2Rename;
+            if (lstKeyEditorKeys != null) lstKeyEditorKeys.KeyDown += handleF2Rename;
+
+            Action<DataGridView> attachRightClickSelect = g =>
+            {
+                if (g == null) return;
+                g.CellMouseDown += (s, e) =>
+                {
+                    if (e.Button == MouseButtons.Right && e.RowIndex >= 0)
+                    {
+                        if (!g.Rows[e.RowIndex].Selected)
+                        {
+                            g.ClearSelection();
+                            g.Rows[e.RowIndex].Selected = true;
+                            if (e.ColumnIndex >= 0)
+                            {
+                                try { g.CurrentCell = g.Rows[e.RowIndex].Cells[e.ColumnIndex]; } catch { }
+                            }
+                        }
+                    }
+                };
+            };
+            attachRightClickSelect(gridLabels);
+            attachRightClickSelect(gridUnsaved);
+            attachRightClickSelect(gridRecent);
+            attachRightClickSelect(gridCoverage);
             gridLabels.SelectionChanged += (s, e) => UpdateUIForSessionMode();
             gridLabels.CellPainting += (s, e) =>
             {
@@ -3621,19 +3654,9 @@ namespace CsfStudio.UI
             Action doRename = () =>
             {
                 string newKey = txtKey.Text.Trim();
-                if (!string.IsNullOrEmpty(newKey) && !string.Equals(oldKey, newKey, StringComparison.OrdinalIgnoreCase))
+                if (PerformRenameKey(oldKey, newKey, txtKey))
                 {
-                    foreach (var sDoc in _session.Documents)
-                    {
-                        var lbl = sDoc.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, oldKey, StringComparison.OrdinalIgnoreCase));
-                        if (lbl != null)
-                        {
-                            lbl.Name = newKey;
-                            sDoc.IsModified = true;
-                        }
-                    }
-                    AddRecentEditedKey(newKey);
-                    RebuildCategoryTreeAndGrid();
+                    oldKey = newKey;
                 }
             };
 
@@ -7223,6 +7246,7 @@ namespace CsfStudio.UI
                     if (_session.RenameKey(oldKey, newKey))
                     {
                         batchCmd.AddCommand(new RenameKeyCommand(oldKey, newKey));
+                        MarkKeyAsRenamed(oldKey, newKey);
                         count++;
                     }
                 }
@@ -8360,6 +8384,10 @@ namespace CsfStudio.UI
                             }
                         }
                     }
+                    foreach (var kvp in dlg.RenameMapping)
+                    {
+                        MarkKeyAsRenamed(kvp.Key, kvp.Value);
+                    }
                     RebuildCategoryTreeAndGrid();
                     MessageBox.Show(
                         string.Format(LanguageManager.GetString("Msg.RenamedKeysCountFormat", "Renamed {0} key(s)."), renamed),
@@ -8779,27 +8807,68 @@ namespace CsfStudio.UI
         {
             if (string.IsNullOrEmpty(oldKey) || string.IsNullOrEmpty(newKey)) return;
 
-            if (_addedKeyNames.Contains(oldKey))
+            bool wasAdded = _addedKeyNames.Contains(oldKey);
+            bool wasModified = _modifiedKeyNames.Contains(oldKey);
+            bool wasDeleted = _deletedKeyNames.Contains(oldKey);
+
+            if (wasAdded)
             {
                 _addedKeyNames.Remove(oldKey);
                 _addedKeyNames.Add(newKey);
             }
-            if (_modifiedKeyNames.Contains(oldKey))
+            if (wasModified)
             {
                 _modifiedKeyNames.Remove(oldKey);
                 _modifiedKeyNames.Add(newKey);
             }
-            if (_deletedKeyNames.Contains(oldKey))
+            if (wasDeleted)
             {
                 _deletedKeyNames.Remove(oldKey);
                 _deletedKeyNames.Add(newKey);
             }
+
+            if (!wasAdded && !wasDeleted)
+            {
+                _modifiedKeyNames.Add(newKey);
+            }
+
             if (_recentKeyTimestamps.TryGetValue(oldKey, out var dt))
             {
                 _recentKeyTimestamps.Remove(oldKey);
                 _recentKeyTimestamps[newKey] = dt;
             }
-            _modifiedKeyMap.RemoveWhere(k => k.EndsWith($":{oldKey}", StringComparison.OrdinalIgnoreCase));
+            else
+            {
+                _recentKeyTimestamps[newKey] = DateTime.Now;
+            }
+
+            var modMatches = _modifiedKeyMap.Where(k => k.EndsWith($":{oldKey}", StringComparison.OrdinalIgnoreCase)).ToList();
+            foreach (var match in modMatches)
+            {
+                _modifiedKeyMap.Remove(match);
+                int colonIdx = match.IndexOf(':');
+                if (colonIdx >= 0)
+                {
+                    string lang = match.Substring(0, colonIdx);
+                    _modifiedKeyMap.Add($"{lang}:{newKey}");
+                }
+            }
+
+            if (_lastActiveSelectedKeys != null)
+            {
+                for (int i = 0; i < _lastActiveSelectedKeys.Count; i++)
+                {
+                    if (string.Equals(_lastActiveSelectedKeys[i], oldKey, StringComparison.OrdinalIgnoreCase))
+                    {
+                        _lastActiveSelectedKeys[i] = newKey;
+                    }
+                }
+            }
+
+            _unsavedDirty = true;
+            _coverageDirty = true;
+            _recentDirty = true;
+            _keyEditorDirty = true;
         }
 
         private bool IsKeyUnsaved(string keyName)
@@ -9072,17 +9141,54 @@ namespace CsfStudio.UI
                     e.SuppressKeyPress = true;
                     btnApplyRename_Click(btnApplyRename, EventArgs.Empty);
                 }
+                else if (e.KeyCode == Keys.Escape)
+                {
+                    e.SuppressKeyPress = true;
+                    if (txtCurrentKeyName.Tag is string currentKey)
+                    {
+                        txtCurrentKeyName.Text = currentKey;
+                        txtCurrentKeyName.SelectAll();
+                    }
+                }
             };
         }
 
         private void btnApplyRename_Click(object sender, EventArgs e)
         {
-            if (gridLabels.SelectedRows.Count == 0) return;
-            var row = gridLabels.SelectedRows[0].Tag as MasterKeyRow;
-            if (row == null) return;
+            string oldKey = txtCurrentKeyName.Tag as string;
+            if (string.IsNullOrEmpty(oldKey))
+            {
+                oldKey = _currentlyDisplayedSingleRow?.KeyName;
+            }
+            if (string.IsNullOrEmpty(oldKey))
+            {
+                var activeGrid = GetActiveGridForTab(tabControlMain?.SelectedTab);
+                if (activeGrid != null && activeGrid.SelectedRows.Count > 0)
+                {
+                    oldKey = GetKeyNameFromRow(activeGrid, activeGrid.SelectedRows[0]);
+                }
+            }
+            if (string.IsNullOrEmpty(oldKey))
+            {
+                oldKey = GetCurrentlySelectedKeyNames()?.FirstOrDefault();
+            }
+            if (string.IsNullOrEmpty(oldKey) && gridLabels.SelectedRows.Count > 0)
+            {
+                var r = gridLabels.SelectedRows[0].Tag as MasterKeyRow;
+                oldKey = r?.KeyName ?? GetKeyNameFromRow(gridLabels, gridLabels.SelectedRows[0]);
+            }
 
-            string oldKey = row.KeyName;
+            if (string.IsNullOrEmpty(oldKey)) return;
+
             string newKey = txtCurrentKeyName.Text.Trim();
+            PerformRenameKey(oldKey, newKey, txtCurrentKeyName);
+        }
+
+        private bool PerformRenameKey(string oldKey, string newKey, TextBox txtKeyInput = null)
+        {
+            if (string.IsNullOrEmpty(oldKey) || _session == null || _session.Documents.Count == 0) return false;
+
+            newKey = newKey?.Trim();
 
             if (string.IsNullOrWhiteSpace(newKey))
             {
@@ -9091,44 +9197,70 @@ namespace CsfStudio.UI
                     LanguageManager.GetString("Title.InvalidKeyName", "Invalid Key Name"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
-                txtCurrentKeyName.Text = oldKey;
-                return;
+                if (txtKeyInput != null) txtKeyInput.Text = oldKey;
+                return false;
             }
 
-            if (string.Equals(oldKey, newKey, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(oldKey, newKey, StringComparison.Ordinal))
             {
-                return;
+                return false;
             }
 
-            // Duplicate check!
+            // Duplicate check against other keys in session
             var masterKeys = _session.BuildMasterKeyList();
-            if (masterKeys.Any(k => string.Equals(k.KeyName, newKey, StringComparison.OrdinalIgnoreCase)))
+            if (masterKeys.Any(k => !string.Equals(k.KeyName, oldKey, StringComparison.OrdinalIgnoreCase) &&
+                                    string.Equals(k.KeyName, newKey, StringComparison.OrdinalIgnoreCase)))
             {
                 MessageBox.Show(
                     string.Format(LanguageManager.GetString("Msg.DuplicateKeyErrorFormat", "⚠️ Cannot rename key:\n\nA key named '{0}' already exists in this session!\nKey names must be unique."), newKey),
                     LanguageManager.GetString("Title.DuplicateKeyError", "Duplicate Key Error"),
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
-                txtCurrentKeyName.Text = oldKey;
-                txtCurrentKeyName.Focus();
-                txtCurrentKeyName.SelectAll();
-                return;
+                if (txtKeyInput != null)
+                {
+                    txtKeyInput.Text = oldKey;
+                    txtKeyInput.Focus();
+                    txtKeyInput.SelectAll();
+                }
+                return false;
             }
 
-            foreach (var sDoc in _session.Documents)
+            bool renamed = _session.RenameKey(oldKey, newKey);
+            if (!renamed)
             {
-                var label = sDoc.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, oldKey, StringComparison.OrdinalIgnoreCase));
-                if (label != null)
+                foreach (var sDoc in _session.Documents)
                 {
-                    label.Name = newKey;
-                    sDoc.IsModified = true;
+                    if (sDoc.Document == null) continue;
+                    var label = sDoc.Document.Labels.FirstOrDefault(l => string.Equals(l.Name, oldKey, StringComparison.OrdinalIgnoreCase));
+                    if (label != null)
+                    {
+                        label.Name = newKey;
+                        sDoc.IsModified = true;
+                        renamed = true;
+                    }
                 }
             }
 
             _undoManager.Execute(new RenameKeyCommand(oldKey, newKey), _session);
+            UpdateUndoRedoMenuItems();
             MarkKeyAsRenamed(oldKey, newKey);
+
+            if (txtCurrentKeyName != null)
+            {
+                txtCurrentKeyName.Tag = newKey;
+                if (txtKeyInput == txtCurrentKeyName || string.Equals(txtCurrentKeyName.Tag as string, newKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    txtCurrentKeyName.Text = newKey;
+                }
+            }
+            if (txtKeyInput != null)
+            {
+                txtKeyInput.Text = newKey;
+            }
+
             UpdateFormTitle();
             EnsureKeyVisibleAndSelected(newKey);
+            return true;
         }
 
         public void JumpToKeyAndLanguage(string keyName, string langTag = null)
@@ -9175,6 +9307,22 @@ namespace CsfStudio.UI
             }
         }
 
+        private void HandleUndoRedoKeyRenameTracking(IUndoCommand cmd, bool isUndo)
+        {
+            if (cmd is RenameKeyCommand rCmd)
+            {
+                if (isUndo) MarkKeyAsRenamed(rCmd.NewKeyName, rCmd.OldKeyName);
+                else MarkKeyAsRenamed(rCmd.OldKeyName, rCmd.NewKeyName);
+            }
+            else if (cmd is BatchUndoCommand bCmd)
+            {
+                foreach (var sub in bCmd.Commands)
+                {
+                    HandleUndoRedoKeyRenameTracking(sub, isUndo);
+                }
+            }
+        }
+
         private void menuUndo_Click(object sender, EventArgs e)
         {
             try
@@ -9182,6 +9330,7 @@ namespace CsfStudio.UI
                 var cmd = _undoManager.PerformUndo(_session);
                 if (cmd != null)
                 {
+                    HandleUndoRedoKeyRenameTracking(cmd, true);
                     SyncStateWithSession();
                     JumpToKeyAndLanguage(cmd.TargetKeyName, cmd.TargetLanguageTag);
                     UpdateUIForSessionMode();
@@ -9203,6 +9352,7 @@ namespace CsfStudio.UI
                 var cmd = _undoManager.PerformRedo(_session);
                 if (cmd != null)
                 {
+                    HandleUndoRedoKeyRenameTracking(cmd, false);
                     SyncStateWithSession();
                     JumpToKeyAndLanguage(cmd.TargetKeyName, cmd.TargetLanguageTag);
                     UpdateUIForSessionMode();
@@ -9266,9 +9416,20 @@ namespace CsfStudio.UI
                 _selectedCategory = "[All Labels]";
             }
 
+            _lastActiveSelectedKeys = new List<string> { keyName };
+
             RebuildCategoryTreeAndGrid();
             SelectCategoryNodeInTree(_selectedCategory);
-            SelectKeyInGrid(keyName);
+
+            var activeTab = tabControlMain?.SelectedTab;
+            if (activeTab == tabMaster)
+            {
+                SelectKeyInGrid(keyName);
+            }
+            else
+            {
+                SyncSelectionToGrid(gridLabels, _lastActiveSelectedKeys);
+            }
         }
 
         private void SelectCategoryNodeInTree(string category)
@@ -10156,6 +10317,7 @@ namespace CsfStudio.UI
         private ContextMenuStrip _gridContextMenu;
         private ToolStripMenuItem _menuGridAddKey;
         private ToolStripMenuItem _menuGridDuplicateKey;
+        private ToolStripMenuItem _menuGridRenameKey;
         private ToolStripMenuItem _menuGridDeleteKey;
         private ToolStripMenuItem _menuTranslateGridSelection;
         private ToolStripMenuItem _menuTranslateAllOpenDocs;
@@ -10221,6 +10383,11 @@ namespace CsfStudio.UI
             _gridContextMenu = new ContextMenuStrip();
             _menuGridAddKey = new ToolStripMenuItem(LanguageManager.GetString("Toolbar.AddKey", "➕ Add Key"), null, (s, e) => menuAddLabel_Click(s, e));
             _menuGridDuplicateKey = new ToolStripMenuItem(LanguageManager.GetString("Toolbar.DuplicateKey", "📋 Duplicate Key"), null, (s, e) => menuDuplicateKey_Click(s, e));
+            _menuGridRenameKey = new ToolStripMenuItem(LanguageManager.GetString("Toolbar.RenameKey", "✏️ Rename Key (F2)"), null, (s, e) =>
+            {
+                txtCurrentKeyName.Focus();
+                txtCurrentKeyName.SelectAll();
+            });
             _menuGridDeleteKey = new ToolStripMenuItem(LanguageManager.GetString("Toolbar.DeleteKey", "❌ Delete Key"), null, (s, e) => menuDeleteLabel_Click(s, e));
             _menuExportSelectedKeys = new ToolStripMenuItem(LanguageManager.GetString("Menu.ExportSelectedKeys", "📤 Export Selected Keys to TXT"));
             _menuCopyFrom = new ToolStripMenuItem(LanguageManager.GetString("Menu.CopyFrom", "📋 Copy from..."));
@@ -10229,6 +10396,7 @@ namespace CsfStudio.UI
 
             _gridContextMenu.Items.Add(_menuGridAddKey);
             _gridContextMenu.Items.Add(_menuGridDuplicateKey);
+            _gridContextMenu.Items.Add(_menuGridRenameKey);
             _gridContextMenu.Items.Add(_menuGridDeleteKey);
             _gridContextMenu.Items.Add(new ToolStripSeparator());
             _gridContextMenu.Items.Add(_menuExportSelectedKeys);
@@ -10250,6 +10418,7 @@ namespace CsfStudio.UI
                     ? new List<string>(selKeys)
                     : new List<string>();
                 bool hasSel = selKeys != null && selKeys.Count > 0;
+                _menuGridRenameKey.Enabled = (selKeys != null && selKeys.Count == 1);
                 bool canTranslateAll = hasSel && _session != null && _session.Documents != null && _session.Documents.Count > 1;
 
                 _menuTranslateAllOpenDocs.Enabled = canTranslateAll;
